@@ -1,0 +1,212 @@
+<ui version="4.0" >
+ <author></author>
+ <comment></comment>
+ <exportmacro></exportmacro>
+ <class>Gui</class>
+ <widget class="QMainWindow" name="Gui" >
+  <property name="geometry" >
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>519</width>
+    <height>89</height>
+   </rect>
+  </property>
+  <property name="windowTitle" >
+   <string>FTP shares - neteK</string>
+  </property>
+  <widget class="QWidget" name="centralWidget" >
+   <layout class="QHBoxLayout" >
+    <property name="margin" >
+     <number>9</number>
+    </property>
+    <property name="spacing" >
+     <number>6</number>
+    </property>
+    <item>
+     <widget class="QListWidget" name="shareList" >
+      <property name="alternatingRowColors" >
+       <bool>true</bool>
+      </property>
+     </widget>
+    </item>
+    <item>
+     <layout class="QVBoxLayout" >
+      <property name="margin" >
+       <number>0</number>
+      </property>
+      <property name="spacing" >
+       <number>6</number>
+      </property>
+      <item>
+       <widget class="QPushButton" name="create" >
+        <property name="text" >
+         <string>&amp;Create</string>
+        </property>
+        <property name="icon" >
+         <iconset resource="icons.qrc" >:/icons/add.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="deleteShare" >
+        <property name="text" >
+         <string>&amp;Delete</string>
+        </property>
+        <property name="icon" >
+         <iconset resource="icons.qrc" >:/icons/remove.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="settings" >
+        <property name="text" >
+         <string>S&amp;ettings</string>
+        </property>
+        <property name="icon" >
+         <iconset resource="icons.qrc" >:/icons/configure.png</iconset>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="start" >
+        <property name="text" >
+         <string>&amp;Start</string>
+        </property>
+        <property name="icon" >
+         <iconset resource="icons.qrc" >:/icons/player_play.png</iconset>
+        </property>
+        <property name="iconSize" >
+         <size>
+          <width>16</width>
+          <height>16</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="stop" >
+        <property name="text" >
+         <string>S&amp;top</string>
+        </property>
+        <property name="icon" >
+         <iconset resource="icons.qrc" >:/icons/player_stop.png</iconset>
+        </property>
+        <property name="iconSize" >
+         <size>
+          <width>16</width>
+          <height>16</height>
+         </size>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer>
+        <property name="orientation" >
+         <enum>Qt::Vertical</enum>
+        </property>
+        <property name="sizeHint" >
+         <size>
+          <width>20</width>
+          <height>40</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+     </layout>
+    </item>
+   </layout>
+  </widget>
+  <widget class="QMenuBar" name="menuBar" >
+   <property name="geometry" >
+    <rect>
+     <x>0</x>
+     <y>0</y>
+     <width>519</width>
+     <height>33</height>
+    </rect>
+   </property>
+   <widget class="QMenu" name="menu_File" >
+    <property name="title" >
+     <string>&amp;Actions</string>
+    </property>
+    <addaction name="action_Global_settings" />
+    <addaction name="separator" />
+    <addaction name="action_Quit" />
+   </widget>
+   <addaction name="menu_File" />
+  </widget>
+  <action name="actionDelete" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/remove.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;Delete</string>
+   </property>
+  </action>
+  <action name="actionSettings" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/configure.png</iconset>
+   </property>
+   <property name="text" >
+    <string>S&amp;ettings...</string>
+   </property>
+  </action>
+  <action name="actionStart" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/player_play.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;Start</string>
+   </property>
+  </action>
+  <action name="actionStop" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/player_stop.png</iconset>
+   </property>
+   <property name="text" >
+    <string>S&amp;top</string>
+   </property>
+  </action>
+  <action name="action_Global_settings" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/configure.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;Global settings</string>
+   </property>
+  </action>
+  <action name="action_Quit" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/exit.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut" >
+    <string>Ctrl+Q</string>
+   </property>
+  </action>
+  <action name="action_Create_share" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/add.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;Create share</string>
+   </property>
+  </action>
+  <action name="action_FTP_shares" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/network.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;FTP shares</string>
+   </property>
+  </action>
+ </widget>
+ <pixmapfunction></pixmapfunction>
+ <resources>
+  <include location="icons.qrc" />
+ </resources>
+ <connections/>
+</ui>
