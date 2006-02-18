@@ -197,7 +197,7 @@
   </action>
   <action name="action_FTP_shares" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/network.png</iconset>
+    <iconset resource="icons.qrc" >:/icons/netek.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;FTP shares</string>
