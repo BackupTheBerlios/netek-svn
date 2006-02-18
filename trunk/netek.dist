@@ -1,0 +1,25 @@
+#! /bin/sh
+
+set -ex
+
+ver=0.8.0
+
+root=`pwd`
+rm -fr .dist
+mkdir .dist
+cd .dist
+mkdir netek-$ver
+cd netek-$ver
+cp $root/netek_*.{cpp,h,ui} $root/netek.{pro,spec,desktop,nsi,dist} $root/icons.qrc $root/netek_trayicon.ico .
+mkdir icons
+cd icons
+cp $root/icons/*.png .
+cd ..
+
+cd ..
+tar -cf netek-$ver.tar netek-$ver
+bzip2 --best netek-$ver.tar
+mv netek-$ver.tar.bz2 ..
+
+cd ..
+rm -fr .dist
