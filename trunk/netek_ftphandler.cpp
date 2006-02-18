@@ -11,16 +11,20 @@
 // TODO: ipv6 support
 // TODO: public address support
 // TODO: resolvePath should be moved into share...?
-// TODO: zero file size crash
+// TODO: zero file size crash in PORT handler
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_send(false), m_to_be_written(0), m_write_size(0)
 {
+	//qDebug() << __FUNCTION__;
+	
 	m_buffer.resize(100000);
 }
 
 bool neteK::FtpHandlerData::sourceSink(QPointer<QIODevice> &source, QPointer<QIODevice> &sink)
 {
+	//qDebug() << __FUNCTION__;
+	
 	if(!m_socket || !m_dev)
 		return false;
 
@@ -37,6 +41,8 @@ bool neteK::FtpHandlerData::sourceSink(QPointer<QIODevice> &source, QPointer<QIO
 
 bool neteK::FtpHandlerData::connectSourceSink()
 {
+	//qDebug() << __FUNCTION__;
+	
 	QPointer<QIODevice> source, sink;
 	return sourceSink(source, sink)
 		&& connect(source, SIGNAL(readyRead()), SLOT(transferEvent()))
@@ -45,6 +51,8 @@ bool neteK::FtpHandlerData::connectSourceSink()
 
 void neteK::FtpHandlerData::transferEvent()
 {
+	//qDebug() << __FUNCTION__;
+	
 	QPointer<QIODevice> source, sink;
 	if(sourceSink(source, sink)) {
 		if(sink->bytesToWrite())
@@ -93,11 +101,18 @@ void neteK::FtpHandlerData::transferEvent()
 neteK::FtpHandlerPORT::FtpHandlerPORT(QHostAddress address, quint16 port)
 : m_address(address), m_port(port), m_connected(false)
 {
+	//qDebug() << __FUNCTION__;
 }
 
 void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 {
+	//qDebug() << __FUNCTION__;
+	
 	m_send = send;
+	
+	Q_ASSERT(!m_dev);
+	m_dev = dev;
+	m_dev->setParent(this);
 
 	Q_ASSERT(!m_socket);
 
@@ -105,17 +120,17 @@ void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 	connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(status()));
 	connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SLOT(status()));
 	m_socket->connectToHost(m_address, m_port);
-
-	Q_ASSERT(!m_dev);
-	m_dev = dev;
-	m_dev->setParent(this);
 }
 
 void neteK::FtpHandlerPORT::status()
 {
+	//qDebug() << __FUNCTION__;
+	
 	if(!m_socket)
 		return;
-
+		
+	//qDebug() << __FUNCTION__ << m_socket->state();
+	
 	if(!m_connected) {
 		if(m_socket->state() == QAbstractSocket::ConnectedState) {
 			m_connected = true;
