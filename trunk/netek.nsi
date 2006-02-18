@@ -22,6 +22,7 @@ Section Install
 	SetOutPath "$INSTDIR"
 	File release\netek.exe
 	File icons\netek.ico
+	File c:\qt\4.1.0\bin\mingwm10.dll
 	WriteUninstaller "$INSTDIR\uninstaller.exe"
 	WriteRegStr HKLM "Software\neteK" "uninstaller" "$INSTDIR\uninstaller.exe"
 
@@ -33,6 +34,7 @@ SectionEnd
 Section Uninstall
 	Delete "$INSTDIR\netek.exe"
 	Delete "$INSTDIR\netek.ico"
+	Delete "$INSTDIR\mingwm10.dll"
 	Delete "$SMPROGRAMS\neteK\Uninstall neteK.lnk"
 	Delete "$SMPROGRAMS\neteK\neteK.lnk"
 	RMDir "$SMPROGRAMS\neteK"
