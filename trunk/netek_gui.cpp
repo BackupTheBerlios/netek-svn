@@ -4,7 +4,6 @@
 #include "netek_globalsettings.h"
 #include "netek_trayicon.h"
 
-// TODO: recheck setParents
 // TODO: store last window position in settings
 
 neteK::Gui::Gui()
@@ -13,7 +12,7 @@ neteK::Gui::Gui()
 
 	m_icon = makeTrayIcon(this);
 	if(m_icon) {
-        m_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater()));
+		m_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater()));
 		connect(m_icon, SIGNAL(activated()), SLOT(toggleVisible()));
 		connect(m_icon, SIGNAL(showMenu(const QPoint &)), SLOT(trayMenu(const QPoint &)));
 	}
