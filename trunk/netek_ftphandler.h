@@ -9,23 +9,32 @@ class Share;
 
 class FtpHandlerData: public QObject {
 	Q_OBJECT;
+	
+	bool m_start, m_transfer;
+	qint64 m_to_be_written, m_write_size;
+	QByteArray m_buffer;
 
 protected:
-	QByteArray m_buffer;
 	QPointer<QAbstractSocket> m_socket;
 	QPointer<QIODevice> m_dev;
 	bool m_send;
-	qint64 m_to_be_written, m_write_size;
 
 	bool sourceSink(QPointer<QIODevice> &source, QPointer<QIODevice> &sink);
 	bool connectSourceSink();
+	
+	void emitStartStatus(bool ok);
+	void emitTransferStatus(bool ok);
 
 protected slots:
 	void transferEvent();
+	virtual void status() = 0;
 
 signals:
 	void startStatus(bool ok);
 	void transferStatus(bool ok);
+	
+	void statusSignal();
+	void transferSignal();
 
 public:
 	FtpHandlerData();
@@ -132,6 +141,9 @@ class FtpHandler: public QObject {
 	QStringList resolvePath(QString args) const;
 	static QString quotedPath(QStringList path);
 	static QString month(int m);
+	
+signals:
+	void processSignal();
 	
 private slots:
 	void process();

@@ -7,18 +7,37 @@
 // TODO: <CR><NUL> escaping (RFC 2640)
 // TODO: rest & STOR - insert
 // TODO: fix socket speed - unbuffered sockets?
-// TODO: unicode test
 // TODO: ipv6 support
 // TODO: public address support
 // TODO: resolvePath should be moved into share...?
-// TODO: zero file size crash in PORT handler
 
 neteK::FtpHandlerData::FtpHandlerData()
-: m_send(false), m_to_be_written(0), m_write_size(0)
+: m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
 {
 	//qDebug() << __FUNCTION__;
 	
 	m_buffer.resize(100000);
+	
+	connect(this, SIGNAL(statusSignal()), SLOT(status()), Qt::QueuedConnection);
+	connect(this, SIGNAL(transferSignal()), SLOT(transferEvent()), Qt::QueuedConnection);
+}
+
+void neteK::FtpHandlerData::emitStartStatus(bool ok)
+{
+	if(!m_start) {
+		m_start = true;
+		emit startStatus(ok);
+	}
+}
+
+void neteK::FtpHandlerData::emitTransferStatus(bool ok)
+{
+	Q_ASSERT(m_start);
+	
+	if(!m_transfer) {
+		m_transfer = true;
+		emit transferStatus(ok);
+	}
 }
 
 bool neteK::FtpHandlerData::sourceSink(QPointer<QIODevice> &source, QPointer<QIODevice> &sink)
@@ -45,8 +64,8 @@ bool neteK::FtpHandlerData::connectSourceSink()
 	
 	QPointer<QIODevice> source, sink;
 	return sourceSink(source, sink)
-		&& connect(source, SIGNAL(readyRead()), SLOT(transferEvent()))
-		&& connect(sink, SIGNAL(bytesWritten(qint64)), SLOT(transferEvent()));
+		&& connect(source, SIGNAL(readyRead()), SIGNAL(transferSignal()))
+		&& connect(sink, SIGNAL(bytesWritten(qint64)), SIGNAL(transferSignal()));
 }
 
 void neteK::FtpHandlerData::transferEvent()
@@ -117,8 +136,8 @@ void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 	Q_ASSERT(!m_socket);
 
 	m_socket = new QTcpSocket(this);
-	connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(status()));
-	connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SLOT(status()));
+	connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()));
+	connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
 	m_socket->connectToHost(m_address, m_port);
 }
 
@@ -134,15 +153,15 @@ void neteK::FtpHandlerPORT::status()
 	if(!m_connected) {
 		if(m_socket->state() == QAbstractSocket::ConnectedState) {
 			m_connected = true;
-			emit startStatus(true);
+			emitStartStatus(true);
 			connectSourceSink();
 			transferEvent();
 		} else if(m_socket->state() == QAbstractSocket::UnconnectedState) {
-			emit startStatus(false);
+			emitStartStatus(false);
 		}
 	} else {
 		if(m_socket->state() == QAbstractSocket::UnconnectedState) {
-			emit transferStatus(true);
+			emitTransferStatus(true);
 		}
 	}
 }
@@ -176,7 +195,7 @@ void neteK::FtpHandlerPASV::start(QIODevice *dev, bool send)
 	m_dev->setParent(this);
 
 	Q_ASSERT(m_server);
-	connect(m_server, SIGNAL(newConnection()), SLOT(handleNewClient()));
+	connect(m_server, SIGNAL(newConnection()), SLOT(handleNewClient()), Qt::QueuedConnection);
 	handleNewClient();
 }
 
@@ -195,11 +214,11 @@ void neteK::FtpHandlerPASV::handleNewClient()
 			}
 
 			m_socket->setParent(this);
-			connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(status()));
-			connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SLOT(status()));
+			connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()));
+			connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
 
 			connectSourceSink();
-			emit startStatus(true);
+			emitStartStatus(true);
 		}
 
 		m_server->deleteLater();
@@ -215,7 +234,7 @@ void neteK::FtpHandlerPASV::status()
 		return;
 
 	if(m_socket->state() == QAbstractSocket::UnconnectedState)
-		emit transferStatus(true);
+		emitTransferStatus(true);
 }
 
 
@@ -226,9 +245,10 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 {
 	m_control->setParent(this);
 
-	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SLOT(process()));
-	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(process()));
-	connect(m_control, SIGNAL(readyRead()), SLOT(process()));
+	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
+	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
+	connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
+	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
 
 #define ADD_COMMAND(_cmd, _flags) addCommand(&FtpHandler::command_ ## _cmd, #_cmd, (_flags))
 	ADD_COMMAND(USER, 0);
@@ -309,8 +329,8 @@ void neteK::FtpHandler::setDataChannel(FtpHandlerData *data)
 	if(data) {
 		m_data__ = data;
 		m_data__->setParent(this);
-		connect(m_data__, SIGNAL(startStatus(bool)), SLOT(dataStartStatus(bool)));
-		connect(m_data__, SIGNAL(transferStatus(bool)), SLOT(dataTransferStatus(bool)));
+		connect(m_data__, SIGNAL(startStatus(bool)), SLOT(dataStartStatus(bool)), Qt::QueuedConnection);
+		connect(m_data__, SIGNAL(transferStatus(bool)), SLOT(dataTransferStatus(bool)), Qt::QueuedConnection);
 	}
 }
 
