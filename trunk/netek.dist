@@ -10,10 +10,10 @@ mkdir .dist
 cd .dist
 mkdir netek-$ver
 cd netek-$ver
-cp $root/netek_*.{cpp,h,ui} $root/netek.{pro,spec,desktop,nsi,dist} $root/icons.qrc $root/netek_trayicon.ico .
+cp $root/netek_*.{cpp,h,ui} $root/netek.{pro,spec,desktop,nsi,dist} $root/icons.qrc .
 mkdir icons
 cd icons
-cp $root/icons/*.png .
+cp $root/icons/*.{png,ico} .
 cd ..
 
 cd ..
