@@ -1,5 +1,8 @@
 #include "netek_trayicon.h"
 
+// TODO: transparent X11 icon
+// TODO: include .ico as resource under windows
+
 #ifdef Q_OS_UNIX
 #include <QX11Info>
 #include <X11/Xlib.h>
