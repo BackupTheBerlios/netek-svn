@@ -27,13 +27,13 @@ Section Install
 
 	CreateDirectory "$SMPROGRAMS\neteK"
 	CreateShortCut "$SMPROGRAMS\neteK\neteK.lnk" "$INSTDIR\netek.exe" "" "$INSTDIR\netek.ico"
-	CreateShortCut "$SMPROGRAMS\neteK\Uninstall.lnk" "$INSTDIR\uninstaller.exe"
+	CreateShortCut "$SMPROGRAMS\neteK\Uninstall neteK.lnk" "$INSTDIR\uninstaller.exe"
 SectionEnd
 
 Section Uninstall
 	Delete "$INSTDIR\netek.exe"
 	Delete "$INSTDIR\netek.ico"
-	Delete "$SMPROGRAMS\neteK\Uninstall.lnk"
+	Delete "$SMPROGRAMS\neteK\Uninstall neteK.lnk"
 	Delete "$SMPROGRAMS\neteK\neteK.lnk"
 	RMDir "$SMPROGRAMS\neteK"
 	Delete "$INSTDIR\uninstaller.exe"
