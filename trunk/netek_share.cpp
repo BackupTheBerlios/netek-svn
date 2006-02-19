@@ -105,7 +105,7 @@ void neteK::Share::clientGone()
 void neteK::Share::checkServer()
 {
 	if(m_run && !m_server && status() != StatusUnconfigured) {
-		m_server = new QTcpServer;
+		m_server = new QTcpServer(this);
 		connect(m_server, SIGNAL(newConnection()), SLOT(handleNewClient()));
 
 		if(!m_server->listen(QHostAddress::Any, m_port)) {
