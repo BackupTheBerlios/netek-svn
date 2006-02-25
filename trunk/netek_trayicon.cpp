@@ -17,7 +17,7 @@ namespace neteK {
 
 #ifdef Q_OS_UNIX
 class TrapErrorsX11 {
-	static bool error;
+	static bool error, already;
 	static int (*handler)(Display *, XErrorEvent *);
 
 	static int myhandler(Display *, XErrorEvent *)
@@ -28,8 +28,9 @@ class TrapErrorsX11 {
 public:
 	TrapErrorsX11()
 	{
-		Q_ASSERT(handler != myhandler);
+		Q_ASSERT(!already);
 
+		already = true;
 		error = false;
 		handler = XSetErrorHandler(myhandler);
 	}
@@ -39,10 +40,12 @@ public:
 	~TrapErrorsX11()
 	{
 		XSetErrorHandler(handler);
+		already = false;
 	}
 };
 
 bool TrapErrorsX11::error;
+bool TrapErrorsX11::already = false;
 int (*TrapErrorsX11::handler)(Display *, XErrorEvent *) = 0;
 
 class TrayIconX11: public QWidget {
@@ -108,7 +111,7 @@ public slots:
 	void recheck()
 	{
 		{
-			TrapErrorsX11 err, err2;
+			TrapErrorsX11 err;
 
 			Atom a = XInternAtom(x11Info().display(), QString("_NET_SYSTEM_TRAY_S%1").arg(x11Info().appScreen()).toUtf8().data(), True);
 			//qDebug() << "Atom:" << a;
