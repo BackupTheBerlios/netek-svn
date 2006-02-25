@@ -5,6 +5,8 @@
 #include "netek_trayicon.h"
 #include "netek_settings.h"
 
+// TODO: add logging of events
+
 neteK::Gui::Gui()
 : m_save_geometry_timer(false)
 {
