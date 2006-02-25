@@ -17,3 +17,9 @@ QString neteK::Settings::publicAddress()
 
 void neteK::Settings::setPublicAddress(QString addr)
 { setValue("publicAddress", addr); }
+
+void neteK::Settings::setGuiGeometry(QRect rect)
+{ setValue("gui/geometry", rect); }
+
+QRect neteK::Settings::guiGeometry()
+{ return value("gui/geometry").toRect(); }

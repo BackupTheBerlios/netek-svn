@@ -14,17 +14,21 @@ class Gui: public QMainWindow {
 	Q_OBJECT;
 	
 	QPointer<QObject> m_icon;
+	bool m_save_geometry_timer;
 	
 public:
 	Gui();
 	
 	void closeEvent(QCloseEvent *);
+	void resizeEvent(QResizeEvent *);
+	void moveEvent(QMoveEvent *);
 
 private:
 	Ui::Gui ui;
 	
 	QPointer<Shares> m_shares;
 	Share *currentShare();
+	void saveGeometryTimer();
 	
 signals:
 	void quit();
@@ -39,6 +43,7 @@ public slots:
 	void globalSettings();
 	void toggleVisible();
 	void trayMenu(const QPoint &pos);
+	void saveGeometry();
 };
 
 }

@@ -3,10 +3,10 @@
 #include "netek_shares.h"
 #include "netek_globalsettings.h"
 #include "netek_trayicon.h"
-
-// TODO: store last window position in settings
+#include "netek_settings.h"
 
 neteK::Gui::Gui()
+: m_save_geometry_timer(false)
 {
 	ui.setupUi(this);
 
@@ -49,6 +49,12 @@ neteK::Gui::Gui()
 	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
 
 	sharesChanged();
+	
+	{
+		QRect geom = Settings().guiGeometry();
+		resize(geom.size());
+		move(geom.topLeft());
+	}
 
 	if(!m_icon)
 		show();
@@ -61,6 +67,26 @@ void neteK::Gui::closeEvent(QCloseEvent *e)
 		e->ignore();
 	} else
 		emit quit();
+}
+
+void neteK::Gui::resizeEvent(QResizeEvent *)
+{ saveGeometryTimer(); }
+
+void neteK::Gui::moveEvent(QMoveEvent *)
+{ saveGeometryTimer(); }
+
+void neteK::Gui::saveGeometryTimer()
+{
+	if(!m_save_geometry_timer) {
+		m_save_geometry_timer = true;
+		QTimer::singleShot(100, this, SLOT(saveGeometry()));
+	}
+}
+
+void neteK::Gui::saveGeometry()
+{
+	m_save_geometry_timer = false;
+	Settings().setGuiGeometry(QRect(pos(), size()));
 }
 
 void neteK::Gui::toggleVisible()

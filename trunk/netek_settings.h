@@ -15,6 +15,9 @@ public:
 	
 	QString publicAddress();
 	void setPublicAddress(QString addr);
+	
+	QRect guiGeometry();
+	void setGuiGeometry(QRect rect);
 };
 
 }
