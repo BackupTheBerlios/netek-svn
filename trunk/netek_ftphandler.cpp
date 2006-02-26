@@ -5,11 +5,9 @@
 // TODO: convert_crlf
 // TODO: no space left on disk test
 // TODO: <CR><NUL> escaping (RFC 2640)
-// TODO: rest & STOR - insert
 // TODO: fix socket speed - unbuffered sockets?
 // TODO: ipv6 support
 // TODO: public address support
-// TODO: resolvePath should be moved into share...?
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
@@ -434,6 +432,7 @@ void neteK::FtpHandler::command_FEAT(QString)
 		QStringList feats;
 		feats.append("Features:");
 		feats.append("MDTM");
+		feats.append("REST STREAM");
 		feats.append("SIZE");
 		feats.append("UTF8");
 		feats.append("End");
@@ -788,6 +787,12 @@ void neteK::FtpHandler::command_RETR(QString args)
 
 void neteK::FtpHandler::command_STOU(QString)
 {
+	if(m_rest >= 0) {
+		// REST unimplemented for STOU, refuse to prevent data corruption
+		sendLine(450, "Requested file action not taken.");
+		return;
+	}
+	
 	QString tmp;
 	QPointer<QFile> file = m_share->writeFileUnique(m_cwd, tmp);
 	if(file) {
@@ -800,6 +805,12 @@ void neteK::FtpHandler::command_STOU(QString)
 
 void neteK::FtpHandler::command_STOR(QString args)
 {
+	if(m_rest >= 0) {
+		// REST unimplemented for STOR, refuse to prevent data corruption
+		sendLine(450, "Requested file action not taken.");
+		return;
+	}
+	
 	QPointer<QFile> file = m_share->writeFile(m_cwd, args);
 	if(file)
 		startDataChannel(file, false);
@@ -809,6 +820,12 @@ void neteK::FtpHandler::command_STOR(QString args)
 
 void neteK::FtpHandler::command_APPE(QString args)
 {
+	if(m_rest >= 0) {
+		// REST unimplemented for APPE, refuse to prevent data corruption
+		sendLine(450, "Requested file action not taken.");
+		return;
+	}
+	
 	QPointer<QFile> file = m_share->writeFile(m_cwd, args, true);
 	if(file)
 		startDataChannel(file, false);
