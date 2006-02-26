@@ -126,11 +126,11 @@ class FtpHandler: public QObject {
 	bool m_loggedin;
 	QString m_username;
 	bool m_control_channel_blocked;
-	QStringList m_cwd;
+	QString m_cwd;
 	bool m_convert_crlf;
 	qint64 m_rest;
 	QString m_store_unique;
-	QStringList m_rename_from;
+	QString m_rename_from;
 
 	void init();
 	void closeDataChannel();
@@ -138,8 +138,8 @@ class FtpHandler: public QObject {
 	void startDataChannel(QIODevice *dev, bool send);
 	void sendLine(int code, QString args);
 	void sendLines(int code, QStringList args);
-	QStringList resolvePath(QString args) const;
-	static QString quotedPath(QStringList path);
+	bool list(QString path, QFileInfoList &lst);
+	static QString quotedPath(QString path);
 	static QString month(int m);
 	
 signals:

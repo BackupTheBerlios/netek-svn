@@ -244,6 +244,8 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	m_rest(-1)
 {
 	m_control->setParent(this);
+	
+	m_cwd = m_share->initialFolder();
 
 	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
 	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
@@ -314,6 +316,30 @@ void neteK::FtpHandler::init()
 	sendLine(220, QCoreApplication::applicationName());
 }
 
+bool neteK::FtpHandler::list(QString path, QFileInfoList &lst)
+{
+	QFileInfo info;
+	if(m_share->fileInformation(m_cwd, path, info)) {
+		if(info.isDir()) { // TODO: check symlink behaviour
+			QFileInfoList tmp;
+			if(m_share->listFolder(m_cwd, path, tmp)) {
+				foreach(QFileInfo t, tmp)
+					if(t.fileName() != "." && t.fileName() != "..")
+						lst.append(t);
+				return true;
+			}
+			
+			return false;
+		}
+		
+		lst.append(info);
+		
+		return true;
+	}
+	
+	return false;
+}
+
 void neteK::FtpHandler::closeDataChannel()
 {
 	if(m_data__) {
@@ -378,18 +404,17 @@ void neteK::FtpHandler::command_REIN(QString)
 
 void neteK::FtpHandler::command_RNFR(QString args)
 {
-	m_rename_from = resolvePath(args);
-	if(m_share->isFolderReadable(m_rename_from) || m_share->fileExists(m_rename_from))
+	QFileInfo info;
+	if(m_share->fileInformation(m_cwd, args, info)) {
+		m_rename_from = args;
 		sendLine(350, "Requested file action pending further information.");
-	else {
-		m_rename_from.clear();
+	} else
 		sendLine(550, "Requested action not taken.");
-	}
 }
 
 void neteK::FtpHandler::command_RNTO(QString args)
 {
-	if(m_share->rename(m_rename_from, resolvePath(args)))
+	if(m_share->rename(m_cwd, m_rename_from, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(553, "Requested action not taken.");
@@ -482,21 +507,17 @@ void neteK::FtpHandler::command_TYPE(QString args)
 
 void neteK::FtpHandler::command_CDUP(QString)
 {
-	QStringList new_path = resolvePath("..");
-	if(m_share->isFolderReadable(new_path)) {
-		m_cwd = new_path;
+	if(m_share->changeCurrentFolder(m_cwd, "..", m_cwd))
 		sendLine(200, "Command okay.");
-	} else
+	else
 		sendLine(550, "Requested action not taken.");
 }
 
 void neteK::FtpHandler::command_CWD(QString args)
 {
-	QStringList new_path = resolvePath(args);
-	if(m_share->isFolderReadable(new_path)) {
-		m_cwd = new_path;
+	if(m_share->changeCurrentFolder(m_cwd, args, m_cwd))
 		sendLine(250, "Requested file action okay, completed.");
-	} else
+	else
 		sendLine(550, "Requested action not taken.");
 }
 
@@ -505,21 +526,14 @@ void neteK::FtpHandler::command_PWD(QString)
 	sendLine(257, quotedPath(m_cwd));
 }
 
-QString neteK::FtpHandler::quotedPath(QStringList path)
+QString neteK::FtpHandler::quotedPath(QString path)
 {
 	QString qf('"');
-	if(path.size() == 0) {
-		qf += '/';
-	} else {
-		foreach(QString p, path) {
-			qf += '/';
-			foreach(QChar c, p) {
-				if(c == '"')
-					qf += "\"\"";
-				else
-					qf += c;
-			}
-		}
+	foreach(QChar c, path) {
+		if(c == '"')
+			qf += "\"\"";
+		else
+			qf += c;
 	}
 
 	qf += '"';
@@ -530,7 +544,7 @@ QString neteK::FtpHandler::quotedPath(QStringList path)
 void neteK::FtpHandler::command_MDTM(QString args)
 {
 	QFileInfo info;
-	if(m_share->pathInformation(resolvePath(args), info) && info.isFile()) {
+	if(m_share->fileInformation(m_cwd, args, info) && info.isFile()) {
 		sendLine(213, info.lastModified().toString("yyyyMMddHHmmss"));
 	} else {
 		sendLine(550, "Requested action not taken.");
@@ -540,7 +554,7 @@ void neteK::FtpHandler::command_MDTM(QString args)
 void neteK::FtpHandler::command_SIZE(QString args)
 {
 	QFileInfo info;
-	if(m_share->pathInformation(resolvePath(args), info) && info.isFile()) {
+	if(m_share->fileInformation(m_cwd, args, info) && info.isFile()) {
 		sendLine(213, QString::number(info.size()));
 	} else {
 		sendLine(550, "Requested action not taken.");
@@ -550,7 +564,7 @@ void neteK::FtpHandler::command_SIZE(QString args)
 void neteK::FtpHandler::command_NLST(QString args)
 {
 	QFileInfoList info;
-	if(!m_share->pathInformationList(resolvePath(args), info)) {
+	if(!list(args, info)) {
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
@@ -606,7 +620,7 @@ void neteK::FtpHandler::command_LIST(QString args)
 	}
 
 	QFileInfoList info;
-	if(!m_share->pathInformationList(resolvePath(args), info)) {
+	if(!list(args, info)) {
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
@@ -765,7 +779,7 @@ void neteK::FtpHandler::command_REST(QString args)
 
 void neteK::FtpHandler::command_RETR(QString args)
 {
-	QPointer<QFile> file = m_share->readFile(resolvePath(args), m_rest >= 0 ? m_rest : 0);
+	QPointer<QFile> file = m_share->readFile(m_cwd, args, m_rest >= 0 ? m_rest : 0);
 	if(file)
 		startDataChannel(file, true);
 	else
@@ -786,7 +800,7 @@ void neteK::FtpHandler::command_STOU(QString)
 
 void neteK::FtpHandler::command_STOR(QString args)
 {
-	QPointer<QFile> file = m_share->writeFile(resolvePath(args));
+	QPointer<QFile> file = m_share->writeFile(m_cwd, args);
 	if(file)
 		startDataChannel(file, false);
 	else
@@ -795,7 +809,7 @@ void neteK::FtpHandler::command_STOR(QString args)
 
 void neteK::FtpHandler::command_APPE(QString args)
 {
-	QPointer<QFile> file = m_share->writeFile(resolvePath(args), true);
+	QPointer<QFile> file = m_share->writeFile(m_cwd, args, true);
 	if(file)
 		startDataChannel(file, false);
 	else
@@ -804,7 +818,7 @@ void neteK::FtpHandler::command_APPE(QString args)
 
 void neteK::FtpHandler::command_DELE(QString args)
 {
-	if(m_share->deleteFile(resolvePath(args)))
+	if(m_share->deleteFile(m_cwd, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(550, "Requested action not taken.");
@@ -812,7 +826,7 @@ void neteK::FtpHandler::command_DELE(QString args)
 
 void neteK::FtpHandler::command_RMD(QString args)
 {
-	if(m_share->deleteFolder(resolvePath(args)))
+	if(m_share->deleteFolder(m_cwd, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(550, "Requested action not taken.");
@@ -820,9 +834,9 @@ void neteK::FtpHandler::command_RMD(QString args)
 
 void neteK::FtpHandler::command_MKD(QString args)
 {
-	QStringList path(resolvePath(args));
-	if(m_share->createFolder(path))
-		sendLine(257, QString("%1 created.").arg(quotedPath(path)));
+	QString resolved;
+	if(m_share->resolvePath(m_cwd, args, resolved) && m_share->createFolder(m_cwd, args))
+		sendLine(257, QString("%1 created.").arg(quotedPath(resolved)));
 	else
 		sendLine(550, "Requested action not taken.");
 }
@@ -856,27 +870,6 @@ void neteK::FtpHandler::sendLines(int code, QStringList args)
 			m_control->write(QString("%1 %2\r\n").arg(code).arg(args.last()).toUtf8());
 		}
 	}
-}
-
-QStringList neteK::FtpHandler::resolvePath(QString args) const
-{
-	QStringList cwd;
-	if(args.size() == 0 || args.at(0) != '/')
-		cwd = m_cwd;
-
-	QStringList move(args.split('/'));
-	foreach(QString x, move) {
-		if(x.size() == 0 || x == ".")
-			;
-		else if(x == ".." && cwd.size())
-			cwd.removeLast();
-		else
-			cwd.append(x);
-	}
-
-	qDebug() << "=== Resolved FTP path:" << cwd;
-
-	return cwd;
 }
 
 void neteK::FtpHandler::dataStartStatus(bool ok)

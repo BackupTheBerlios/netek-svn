@@ -53,19 +53,21 @@ class Share: public QObject {
 		void setAccess(Access a);
 		void setUsernamePassword(QString u, QString p);
 		void usernamePassword(QString &u, QString &p) const;
-
-		bool isFolderReadable(QStringList path) const;
-		bool fileExists(QStringList path) const;
-		bool rename(QStringList path1, QStringList path2) const;
-		bool pathInformation(QStringList path, QFileInfo &info) const;
-		bool pathInformationList(QStringList path, QFileInfoList &list) const;
+		
+		QString initialFolder() const;
+		bool changeCurrentFolder(QString cwd, QString change, QString &newcwd) const;
+		bool rename(QString cwd, QString path, QString path2) const;
+		bool fileInformation(QString cwd, QString path, QFileInfo &info) const;
+		bool listFolder(QString cwd, QString path, QFileInfoList &list) const;
 		bool authenticate(QString username, QString password) const;
-		QFile *readFile(QStringList path, qint64 pos = 0) const;
-		QFile *writeFile(QStringList path, bool append = false) const;
-		QFile *writeFileUnique(QStringList path, QString &name) const;
-		bool deleteFile(QStringList path) const;
-		bool createFolder(QStringList path) const;
-		bool deleteFolder(QStringList path) const;
+		QFile *readFile(QString cwd, QString path, qint64 pos = 0) const;
+		QFile *writeFile(QString cwd, QString path, bool append = false) const;
+		QFile *writeFileUnique(QString cwd, QString &name) const;
+		bool deleteFile(QString cwd, QString path) const;
+		bool createFolder(QString cwd, QString path) const;
+		bool deleteFolder(QString cwd, QString path) const;
+		
+		bool resolvePath(QString cwd, QString path, QString &resolved) const;
 
 	private:
 		QString m_folder;
@@ -76,11 +78,14 @@ class Share: public QObject {
 		Access m_access;
 		QString m_username, m_password;
 		int m_client_count;
-
-		bool resolveDir(QStringList path, QDir &dir) const;
-		bool resolveDirName(QStringList path, QDir &dir, QString &name) const;
-		bool resolveFile(QStringList path, QFile &file) const;
-		static bool forbiddenName(QString name);
+		
+		bool filesystemPath(QString cwd, QString path, QString &fspath, bool nonroot) const;
+		
+		inline bool filesystemPath(QString cwd, QString path, QString &fspath) const
+		{ return filesystemPath(cwd, path, fspath, false); }
+		
+		inline bool filesystemPathNotRoot(QString cwd, QString path, QString &fspath) const
+		{ return filesystemPath(cwd, path, fspath, true); }
 };
 
 }

@@ -181,205 +181,173 @@ bool neteK::Share::showSettings()
 	return false;
 }
 
-bool neteK::Share::forbiddenName(QString name)
-{ return name.size() == 0 || name == "." || name == ".." || name == "/" || name == "\\"; }
+QString neteK::Share::initialFolder() const
+{ return "/"; }
 
-bool neteK::Share::resolveDir(QStringList path, QDir &dir) const
+bool neteK::Share::changeCurrentFolder(QString cwd, QString path, QString &newcwd) const
 {
-	dir.setPath(m_folder);
-	foreach(QString p, path) {
-		if(forbiddenName(p))
-			return false;
-
-		if(!dir.cd(p))
-			return false;
+	QString fspath;
+	if(filesystemPath(cwd, path, fspath) && resolvePath(cwd, path, path)) {
+		QFileInfo info(fspath);
+		if(info.isDir() && info.isReadable()) {
+			newcwd = path;
+			return true;
+		}
 	}
-
-	qDebug() << "=== Resolving directory:" << dir.path();
-
-	return dir.isReadable();
-}
-
-bool neteK::Share::resolveDirName(QStringList path, QDir &dir, QString &name) const
-{
-	if(path.size()) {
-		name = path.last();
-		if(forbiddenName(name))
-			return false;
-
-		qDebug() << "=== Resolving directory entry:" << name;
-
-		path.removeLast();
-		return resolveDir(path, dir);
-	}
-
+	
 	return false;
 }
 
-bool neteK::Share::resolveFile(QStringList path, QFile &file) const
+bool neteK::Share::rename(QString cwd, QString path1, QString path2) const
 {
-	if(path.size()) {
-		QString name = path.last();
-		if(forbiddenName(name))
-			return false;
-
-		qDebug() << "=== Resolving file:" << name;
-
-		path.removeLast();
-
-		QDir dir;
-		if(!resolveDir(path, dir))
-			return false;
-
-		file.setFileName(dir.filePath(name));
-
-		return true;
-	}
-
-	return false;
-}
-
-bool neteK::Share::isFolderReadable(QStringList path) const
-{
-	QDir dir;
-	return resolveDir(path, dir);
-}
-
-bool neteK::Share::fileExists(QStringList path) const
-{
-	QFile file;
-	return resolveFile(path, file) && file.exists();
-}
-
-bool neteK::Share::rename(QStringList path1, QStringList path2) const
-{
-    if(m_readonly)
+	if(m_readonly)
 		return 0;
-
+		
 	// TODO: what if directory is moved into its child directory
-	QDir dir1, dir2;
-	QString name1, name2;
-	return path1.size()
-		&& resolveDirName(path1, dir1, name1)
-		&& resolveDirName(path2, dir2, name2)
-		&& dir1.rename(name1, dir2.filePath(name2));
+	return filesystemPathNotRoot(cwd, path1, path1)
+		&& filesystemPathNotRoot(cwd, path2, path2)
+		&& QFile(path1).rename(path2);
 }
 
-bool neteK::Share::pathInformation(QStringList path, QFileInfo &info) const
+bool neteK::Share::fileInformation(QString cwd, QString path, QFileInfo &info) const
 {
-	QDir dir;
-	QFile file;
-	if(resolveDir(path, dir)) {
-		info = QFileInfo(dir.absolutePath());
-		return true;
-	} else if(resolveFile(path, file) && file.exists()) {
-		info = QFileInfo(file);
-		return true;
+	if(filesystemPath(cwd, path, path)) {
+		info = QFileInfo(path);
+		return info.exists();
 	}
 
 	return false;
 }
 
-bool neteK::Share::pathInformationList(QStringList path, QFileInfoList &list) const
+bool neteK::Share::listFolder(QString cwd, QString path, QFileInfoList &list) const
 {
-	QDir dir;
-	QFile file;
-	if(resolveDir(path, dir)) {
-		QFileInfoList tmp = dir.entryInfoList();
-		foreach(QFileInfo i, tmp)
-			if(!forbiddenName(i.fileName()))
-				list.append(i);
-
-		return true;
-	} else if(resolveFile(path, file) && file.exists()) {
-		list.append(QFileInfo(file));
-		return true;
+	if(filesystemPath(cwd, path, path)) {
+		QFileInfo info = QFileInfo(path);
+		if(info.isDir() && info.isReadable()) {
+			list = QDir(path).entryInfoList();		
+			return true;
+		}
 	}
-
+	
 	return false;
 }
 
-bool neteK::Share::createFolder(QStringList path) const
-{
-    if(m_readonly)
-		return 0;
-
-	QDir dir;
-	QString name;
-	return resolveDirName(path, dir, name) && dir.mkdir(name);
-}
-
-bool neteK::Share::deleteFolder(QStringList path) const
-{
-    if(m_readonly)
-		return 0;
-
-	QDir dir;
-	QString name;
-	return resolveDirName(path, dir, name) && dir.rmdir(name);
-}
-
-QFile *neteK::Share::readFile(QStringList path, qint64 pos) const
-{
-	QPointer<QFile> file(new QFile);
-	if(!resolveFile(path, *file)
-			|| !file->open(QIODevice::ReadOnly)
-			|| pos < 0
-			|| pos > file->size()
-			|| pos != 0 && !file->seek(pos))
-	{
-		delete file;
-		return 0;
-	}
-
-	return file;
-}
-
-QFile *neteK::Share::writeFile(QStringList path, bool append) const
+bool neteK::Share::createFolder(QString cwd, QString path) const
 {
 	if(m_readonly)
 		return 0;
 
-	QPointer<QFile> file(new QFile);
-	if(!resolveFile(path, *file)
-			|| !file->open(append ? QIODevice::Append : QIODevice::WriteOnly))
-	{
-		delete file;
-		return 0;
-	}
-
-	return file;
+	return filesystemPathNotRoot(cwd, path, path) && QDir().mkdir(path);
 }
 
-QFile *neteK::Share::writeFileUnique(QStringList path, QString &fname) const
+bool neteK::Share::deleteFolder(QString cwd, QString path) const
 {
 	if(m_readonly)
 		return 0;
 
-	QDir dir;
-	if(!resolveDir(path, dir))
-		return 0;
+	return filesystemPathNotRoot(cwd, path, path) && QDir().rmdir(path);
+}
 
-	QString prefix(QString("ftp_%1_%2").arg(time(0)).arg(rand() & 0xffff));
-	for(int i=0; i<100; ++i) {
-		fname = QString("%1_%2").arg(prefix).arg(i);
-		QPointer<QFile> file(new QFile);
-		file->setFileName(dir.filePath(fname));
-
-		if(!file->exists() && file->open(QIODevice::WriteOnly))
+QFile *neteK::Share::readFile(QString cwd, QString path, qint64 pos) const
+{
+	if(filesystemPathNotRoot(cwd, path, path)) {
+		QPointer<QFile> file(new QFile(path));
+		if(file->open(QIODevice::ReadOnly)
+			&& pos >= 0 && pos <= file->size()
+			&& (pos == 0 || file->seek(pos)))
 			return file;
-
+			
 		delete file;
+	}
+	
+	return 0;
+}
+
+QFile *neteK::Share::writeFile(QString cwd, QString path, bool append) const
+{
+	if(m_readonly)
+		return 0;
+		
+	if(filesystemPathNotRoot(cwd, path, path)) {
+		QPointer<QFile> file(new QFile(path));
+		if(file->open(append ? QIODevice::Append : QIODevice::WriteOnly))
+			return file;
+			
+		delete file;
+	}
+	
+	return 0;
+}
+
+QFile *neteK::Share::writeFileUnique(QString cwd, QString &fname) const
+{
+	if(m_readonly)
+		return 0;
+
+	QString path;
+	if(filesystemPath(cwd, "", path)) {
+		QString prefix(QString("ftp_%1_%2").arg(time(0)).arg(rand() & 0xffff));
+		for(int i=0; i<100; ++i) {
+			fname = QString("%1_%2").arg(prefix).arg(i);
+			QPointer<QFile> file(new QFile(QDir(path).filePath(fname)));
+	
+			if(!file->exists() && file->open(QIODevice::WriteOnly))
+				return file;
+	
+			delete file;
+		}
 	}
 
 	return 0;
 }
 
-bool neteK::Share::deleteFile(QStringList path) const
+bool neteK::Share::deleteFile(QString cwd, QString path) const
 {
-    if(m_readonly)
+	if(m_readonly)
 		return 0;
 
-	QFile file;
-	return resolveFile(path, file) && file.remove();
+	return filesystemPathNotRoot(cwd, path, path) && QFile(path).remove();
+}
+
+bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) const
+{
+	if(!path.startsWith("/"))
+		path = cwd + "/" + path;
+	
+	QStringList current;
+	QStringList change = path.split('/');
+	foreach(QString c, change)
+		if(c == "." || c == "")
+			;
+		else if(c == "\\")
+			return false;
+		else if(c == "..") {
+			if(current.size() == 0)
+				return false;
+			current.removeLast();
+		} else
+			current.append(c);
+	
+	resolved = "/";
+	resolved += current.join("/");
+	qDebug() << "=== Resolved path:" << resolved;
+	return true;
+}
+
+bool neteK::Share::filesystemPath(QString cwd, QString path, QString &fspath, bool notroot) const
+{
+	QString root = QDir(m_folder).canonicalPath();
+	if(root.size() == 0)
+		return false;
+		
+	QString resolved;
+	if(!resolvePath(cwd, path, resolved))
+		return false;
+		
+	if(notroot && resolved == "/")
+		return false;
+	
+	fspath = QDir(root).filePath(resolved.mid(1));
+	qDebug() << "--- Filesystem path:" << fspath;
+	return true;
 }
