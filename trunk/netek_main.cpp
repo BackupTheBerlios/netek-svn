@@ -17,6 +17,11 @@ int main(int argc, char *argv[])
     );
 
 	neteK::Application app(argc, argv);
+	
+#ifdef Q_OS_UNIX
+	app.setStyle("plastique");
+#endif
+	
 	neteK::Gui gui;
 
 	//gui.show();
