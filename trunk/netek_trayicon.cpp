@@ -1,6 +1,7 @@
 #include "netek_trayicon.h"
 
 // TODO: transparent X11 icon
+// TODO: fix gnome systray icon
 // TODO: include .ico as resource under windows
 
 #ifdef Q_OS_UNIX
