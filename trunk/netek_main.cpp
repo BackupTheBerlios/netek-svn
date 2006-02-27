@@ -8,13 +8,13 @@
 int main(int argc, char *argv[])
 {
 	srand(
-        time(0)
+		time(0)
 #if defined(Q_OS_UNIX)
-        + getpid()
+		+ getpid()
 #elif defined(Q_OS_WIN32)
-        + GetCurrentProcessId() + GetCurrentThreadId()
+		+ GetCurrentProcessId() + GetCurrentThreadId()
 #endif
-    );
+	);
 
 	neteK::Application app(argc, argv);
 	
