@@ -224,7 +224,7 @@ bool neteK::Share::listFolder(QString cwd, QString path, QFileInfoList &list) co
 	if(filesystemPath(cwd, path, path)) {
 		QFileInfo info = QFileInfo(path);
 		if(info.isDir() && info.isReadable()) {
-			list = QDir(path).entryInfoList();		
+			list = QDir(path).entryInfoList(QDir::AllEntries | QDir::NoDotAndDotDot);		
 			return true;
 		}
 	}

@@ -4,7 +4,7 @@
 
 // TODO: convert_crlf
 // TODO: no space left on disk test
-// TODO: <CR><NUL> escaping (RFC 2640)
+// TODO: only turn on utf8, when client says "opts utf8 on"...?
 // TODO: fix socket speed - unbuffered sockets?
 // TODO: ipv6 support
 // TODO: public address support
@@ -242,8 +242,6 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	m_rest(-1)
 {
 	m_control->setParent(this);
-	
-	m_cwd = m_share->initialFolder();
 
 	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
 	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
@@ -305,7 +303,7 @@ void neteK::FtpHandler::init()
 	m_loggedin = false;
 	m_username.clear();
 	m_convert_crlf = true;
-	m_cwd.clear();
+	m_cwd = m_share->initialFolder();
 	m_rest = -1;
 	m_store_unique.clear();
 	m_rename_from.clear();
@@ -317,21 +315,11 @@ void neteK::FtpHandler::init()
 bool neteK::FtpHandler::list(QString path, QFileInfoList &lst)
 {
 	QFileInfo info;
-	if(m_share->fileInformation(m_cwd, path, info)) {
-		if(info.isDir()) { // TODO: check symlink behaviour
-			QFileInfoList tmp;
-			if(m_share->listFolder(m_cwd, path, tmp)) {
-				foreach(QFileInfo t, tmp)
-					if(t.fileName() != "." && t.fileName() != "..")
-						lst.append(t);
-				return true;
-			}
-			
-			return false;
-		}
+	if(m_share->fileInformation(m_cwd, path, info)) { // TODO: recheck file/dir behaviour
+		if(info.isDir()) // TODO: check symlink behaviour
+			return m_share->listFolder(m_cwd, path, lst);
 		
 		lst.append(info);
-		
 		return true;
 	}
 	
@@ -570,10 +558,9 @@ void neteK::FtpHandler::command_NLST(QString args)
 
 	QBuffer *buf = new QBuffer;
 	buf->open(QIODevice::ReadWrite);
-	foreach(QFileInfo i, info) {
-		buf->write(i.fileName().toUtf8());
-		buf->write("\r\n");
-	}
+	foreach(QFileInfo i, info)
+		buf->write(makeLine(i.fileName()));
+	qDebug() << ">>> [" << buf->data().data() << "]";
 	buf->reset();
 	startDataChannel(buf, true);
 }
@@ -628,15 +615,15 @@ void neteK::FtpHandler::command_LIST(QString args)
 
 	QBuffer *buf = new QBuffer;
 	buf->open(QIODevice::ReadWrite);
-	buf->write(QString("total %1\r\n").arg(info.size()).toUtf8());
+	buf->write(makeLine(QString("total %1").arg(info.size())));
 
 	foreach(QFileInfo i, info) {
 		QFile::Permissions p(i.permissions());
 		QString owner = i.owner();
 		QString group = i.group();
 		QDateTime modified = i.lastModified();
-
-		buf->write(QString("%1%2%3%4%5%6%7%8%9%10 %11 %12 %13 %14 %15 %16 %17 %18")
+		
+		buf->write(makeLine(QString("%1%2%3%4%5%6%7%8%9%10 %11 %12 %13 %14 %15 %16 %17 %18")
 			.arg(
 				i.isDir()
 					? 'd'
@@ -663,10 +650,7 @@ void neteK::FtpHandler::command_LIST(QString args)
 					? modified.toString("HH:mm")
 					: modified.toString("yyyy"),
 				5)
-			.arg(i.fileName())
-			.toUtf8());
-
-		buf->write("\r\n");
+			.arg(i.fileName())));
 	}
 	qDebug() << ">>> [" << buf->data().data() << "]";
 	buf->reset();
@@ -858,12 +842,34 @@ void neteK::FtpHandler::command_MKD(QString args)
 		sendLine(550, "Requested action not taken.");
 }
 
-void neteK::FtpHandler::sendLine(int code, QString args)
+QByteArray neteK::FtpHandler::makeLine(QString line)
+{
+	QByteArray out;
+	{
+		QByteArray tmp(line.toUtf8());
+		foreach(char c, tmp)
+			if(c == '\r') {
+				out.append('\r');
+				out.append('\0');
+			} else
+				out.append(c);
+	}
+	out.append("\r\n");
+	
+	return out;
+}
+
+void neteK::FtpHandler::sendLine(QString line)
 {
 	if(m_control) {
-		qDebug() << "-->" << QString("%1 %2").arg(code).arg(args);
-		m_control->write(QString("%1 %2\r\n").arg(code).arg(args).toUtf8());
+		qDebug() << "-->" << line;
+		m_control->write(makeLine(line));
 	}
+}
+
+void neteK::FtpHandler::sendLine(int code, QString args)
+{
+	sendLine(QString("%1 %2").arg(code).arg(args));
 }
 
 void neteK::FtpHandler::sendLines(int code, QStringList args)
@@ -874,18 +880,12 @@ void neteK::FtpHandler::sendLines(int code, QStringList args)
 			return;
 		}
 
-		if(m_control) {
-			qDebug() << "-->" << QString("%1-%2").arg(code).arg(args.at(0));
-			m_control->write(QString("%1-%2\r\n").arg(code).arg(args.at(0)).toUtf8());
+		sendLine(QString("%1-%2").arg(code).arg(args.at(0)));
 
-			for(int i=1; i<args.size()-1; ++i) {
-				qDebug() << "-->" << QString(" %1").arg(args.at(i));
-				m_control->write(QString(" %1\r\n").arg(args.at(i)).toUtf8());
-			}
+		for(int i=1; i<args.size()-1; ++i)
+			sendLine(QString(" %1").arg(args.at(i)));
 
-			qDebug() << "-->" << QString("%1 %2").arg(code).arg(args.last());
-			m_control->write(QString("%1 %2\r\n").arg(code).arg(args.last()).toUtf8());
-		}
+		sendLine(QString("%1 %2").arg(code).arg(args.last()));
 	}
 }
 

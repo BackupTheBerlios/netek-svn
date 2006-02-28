@@ -136,6 +136,8 @@ class FtpHandler: public QObject {
 	void closeDataChannel();
 	void setDataChannel(FtpHandlerData *data);
 	void startDataChannel(QIODevice *dev, bool send);
+	QByteArray makeLine(QString line);
+	void sendLine(QString line);
 	void sendLine(int code, QString args);
 	void sendLines(int code, QStringList args);
 	bool list(QString path, QFileInfoList &lst);
