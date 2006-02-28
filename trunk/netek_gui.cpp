@@ -6,6 +6,8 @@
 #include "netek_settings.h"
 
 // TODO: add logging of events
+// TODO: option to disable passive connections
+// TODO: option to turn off UTF8
 
 neteK::Gui::Gui()
 : m_save_geometry_timer(false)
