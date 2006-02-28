@@ -54,7 +54,7 @@ void neteK::ShareSettings::folderBrowse()
 {
 	QString name = QFileDialog::getExistingDirectory(this, tr("Select share folder"), ui.folder->text());
 	if(name.size())
-		ui.folder->setText(name);
+		ui.folder->setText(name); // TODO: set native name (win32!)
 }
 
 void neteK::ShareSettings::pickRandom()
