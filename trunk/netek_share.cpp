@@ -84,9 +84,12 @@ int neteK::Share::clients() const
 
 void neteK::Share::handleNewClient()
 {
-	if(m_server) {
-		QPointer<FtpHandler> handler =
-			new FtpHandler(this, m_server->nextPendingConnection());
+	while(m_server) {
+		QPointer<QTcpSocket> client = m_server->nextPendingConnection();
+		if(!client)
+			break;
+
+		QPointer<FtpHandler> handler = new FtpHandler(this, client);
 		handler->setParent(this);
 		connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
 		connect(m_server, SIGNAL(destroyed()), handler, SLOT(deleteLater()));
@@ -203,9 +206,9 @@ bool neteK::Share::rename(QString cwd, QString path1, QString path2) const
 	if(m_readonly)
 		return 0;
 		
-	// TODO: what if directory is moved into its child directory
 	return filesystemPathNotRoot(cwd, path1, path1)
 		&& filesystemPathNotRoot(cwd, path2, path2)
+		&& !(path2+'/').startsWith(path1+'/') // this prevents Qt from going into infinite loop
 		&& QFile(path1).rename(path2);
 }
 
@@ -311,6 +314,9 @@ bool neteK::Share::deleteFile(QString cwd, QString path) const
 
 bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) const
 {
+	cwd.replace('\\', '/');
+	path.replace('\\', '/');
+	
 	if(!path.startsWith("/"))
 		path = cwd + "/" + path;
 	
@@ -319,8 +325,6 @@ bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) con
 	foreach(QString c, change)
 		if(c == "." || c == "")
 			;
-		else if(c == "\\")
-			return false;
 		else if(c == "..") {
 			if(current.size() == 0)
 				return false;
@@ -330,16 +334,18 @@ bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) con
 	
 	resolved = "/";
 	resolved += current.join("/");
+	
 	qDebug() << "=== Resolved path:" << resolved;
+	
 	return true;
 }
 
 bool neteK::Share::filesystemPath(QString cwd, QString path, QString &fspath, bool notroot) const
 {
-	// TODO: convert path \ to /, just to be sure
 	QString root = QDir(m_folder).canonicalPath();
 	if(root.size() == 0)
 		return false;
+	root.replace('\\', '/');
 		
 	QString resolved;
 	if(!resolvePath(cwd, path, resolved))
@@ -347,8 +353,11 @@ bool neteK::Share::filesystemPath(QString cwd, QString path, QString &fspath, bo
 		
 	if(notroot && resolved == "/")
 		return false;
-	
+		
 	fspath = QDir(root).filePath(resolved.mid(1));
+	fspath.replace('\\', '/');
+	
 	qDebug() << "--- Filesystem path:" << fspath;
+	
 	return true;
 }

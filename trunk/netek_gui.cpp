@@ -5,9 +5,10 @@
 #include "netek_trayicon.h"
 #include "netek_settings.h"
 
-// TODO: add logging of events
-// TODO: option to disable passive connections
-// TODO: option to turn off UTF8
+// TODO 1.1: zeroconf
+// TODO 1.1: upnp
+// TODO 1.1: add logging of events
+// TODO 1.0: mac os x port
 
 neteK::Gui::Gui()
 : m_save_geometry_timer(false)

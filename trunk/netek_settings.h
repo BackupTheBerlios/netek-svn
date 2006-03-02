@@ -18,6 +18,12 @@ public:
 	
 	QRect guiGeometry();
 	void setGuiGeometry(QRect rect);
+	
+	bool ftpUseUnicodeByDefault();
+	void setFtpUseUnicodeByDefault(bool yes);
+	
+	bool ftpAllowPassive();
+	void setFtpAllowPassive(bool yes);
 };
 
 }

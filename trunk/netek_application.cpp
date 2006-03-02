@@ -5,7 +5,7 @@ static QStringList autostarts()
 {
 	QStringList list;
 	list.append(QDir::home().filePath(".kde/Autostart/netek"));
-	// TODO: add gnome autostart
+	// TODO 1.0: add gnome autostart
 
 	return list;
 }

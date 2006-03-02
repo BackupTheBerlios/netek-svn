@@ -23,3 +23,16 @@ void neteK::Settings::setGuiGeometry(QRect rect)
 
 QRect neteK::Settings::guiGeometry()
 { return value("gui/geometry").toRect(); }
+
+bool neteK::Settings::ftpAllowPassive()
+{ return value("ftp/allowPassive", true).toBool(); }
+
+void neteK::Settings::setFtpAllowPassive(bool yes)
+{ setValue("ftp/allowPassive", yes); }
+
+bool neteK::Settings::ftpUseUnicodeByDefault()
+{ return value("ftp/useUnicodeByDefault", true).toBool(); }
+
+void neteK::Settings::setFtpUseUnicodeByDefault(bool yes)
+{ setValue("ftp/useUnicodeByDefault", yes); }
+

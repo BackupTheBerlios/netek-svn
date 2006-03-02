@@ -2,12 +2,10 @@
 #include "netek_settings.h"
 #include "netek_ftphandler.h"
 
-// TODO: convert_crlf
-// TODO: no space left on disk test
-// TODO: only turn on utf8, when client says "opts utf8 on"...?
-// TODO: fix socket speed - unbuffered sockets?
-// TODO: ipv6 support
-// TODO: public address support
+// TODO 1.0: no space left on disk test
+// TODO 1.1: fix socket speed - unbuffered sockets?
+// TODO 1.0: ipv6 support
+// TODO 1.0: public address support
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
@@ -206,7 +204,7 @@ void neteK::FtpHandlerPASV::handleNewClient()
 				return;
 
 			if(!(m_address == m_socket->peerAddress())) {
-				// TODO: log warning, very likely crack attempt
+				// TODO 1.1: log warning, very likely crack attempt
 				delete m_socket;
 				return;
 			}
@@ -237,10 +235,10 @@ void neteK::FtpHandlerPASV::status()
 
 
 neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
-: m_share(s), m_control(control), m_loggedin(false),
-	m_control_channel_blocked(false), m_convert_crlf(true),
-	m_rest(-1)
+: m_share(s), m_control(control), m_control_channel_blocked(false)
 {
+	Settings settings;
+	
 	m_control->setParent(this);
 
 	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
@@ -258,7 +256,8 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	ADD_COMMAND(QUIT, 0);
 	ADD_COMMAND(REIN, 0);
 	ADD_COMMAND(PORT, CommandFlagLoggedIn);
-	ADD_COMMAND(PASV, CommandFlagLoggedIn);
+	if(settings.ftpAllowPassive())
+		ADD_COMMAND(PASV, CommandFlagLoggedIn);
 	ADD_COMMAND(TYPE, CommandFlagLoggedIn);
 	ADD_COMMAND(STRU, CommandFlagLoggedIn);
 	ADD_COMMAND(MODE, CommandFlagLoggedIn);
@@ -292,7 +291,8 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	//ADD_COMMAND(MLSD, CommandFlagLoggedIn);
 
 	//ADD_COMMAND(EPRT, CommandFlagLoggedIn);
-	ADD_COMMAND(EPSV, CommandFlagLoggedIn);
+	if(settings.ftpAllowPassive())
+		ADD_COMMAND(EPSV, CommandFlagLoggedIn);
 #undef ADD_COMMAND
 
 	init();
@@ -300,11 +300,13 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 
 void neteK::FtpHandler::init()
 {
+	Settings settings;
+	
 	m_loggedin = false;
 	m_username.clear();
-	m_convert_crlf = true;
 	m_cwd = m_share->initialFolder();
 	m_rest = -1;
+	m_utf8 = settings.ftpUseUnicodeByDefault();
 	m_store_unique.clear();
 	m_rename_from.clear();
 	closeDataChannel();
@@ -312,11 +314,14 @@ void neteK::FtpHandler::init()
 	sendLine(220, QCoreApplication::applicationName());
 }
 
-bool neteK::FtpHandler::list(QString path, QFileInfoList &lst)
+bool neteK::FtpHandler::list(QString path, QFileInfoList &lst, bool *dir)
 {
 	QFileInfo info;
-	if(m_share->fileInformation(m_cwd, path, info)) { // TODO: recheck file/dir behaviour
-		if(info.isDir()) // TODO: check symlink behaviour
+	if(m_share->fileInformation(m_cwd, path, info)) {
+		if(dir)
+			*dir = info.isDir();
+			
+		if(info.isDir())
 			return m_share->listFolder(m_cwd, path, lst);
 		
 		lst.append(info);
@@ -431,9 +436,10 @@ void neteK::FtpHandler::command_FEAT(QString)
 
 void neteK::FtpHandler::command_OPTS(QString args)
 {
-	if(args.toUpper() == "UTF8 ON")
+	if(args.toUpper() == "UTF8 ON") {
+		m_utf8 = true;
 		sendLine(200, "Command okay.");
-	else
+	} else
 		sendLine(501, "Syntax error in parameters or arguments.");
 }
 
@@ -481,9 +487,9 @@ void neteK::FtpHandler::command_STRU(QString args)
 void neteK::FtpHandler::command_TYPE(QString args)
 {
 	if(args == "I") {
-		m_convert_crlf = false;
+		//m_convert_crlf = false;
 	} else if(args == "A" || args.startsWith("A ")) {
-		m_convert_crlf = true;
+		//m_convert_crlf = true;
 	} else {
 		sendLine(504, "Command not implemented for that parameter.");
 		return;
@@ -550,8 +556,9 @@ void neteK::FtpHandler::command_SIZE(QString args)
 
 void neteK::FtpHandler::command_NLST(QString args)
 {
+	bool isdir;
 	QFileInfoList info;
-	if(!list(args, info)) {
+	if(!list(args, info, &isdir)) {
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
@@ -559,8 +566,13 @@ void neteK::FtpHandler::command_NLST(QString args)
 	QBuffer *buf = new QBuffer;
 	buf->open(QIODevice::ReadWrite);
 	foreach(QFileInfo i, info)
-		buf->write(makeLine(i.fileName()));
+		buf->write(makeLine(
+			isdir && args.size()
+				? args + "/" + i.fileName() // emulating vsftpd here
+				: i.fileName()));
+				
 	qDebug() << ">>> [" << buf->data().data() << "]";
+	
 	buf->reset();
 	startDataChannel(buf, true);
 }
@@ -624,12 +636,7 @@ void neteK::FtpHandler::command_LIST(QString args)
 		QDateTime modified = i.lastModified();
 		
 		buf->write(makeLine(QString("%1%2%3%4%5%6%7%8%9%10 %11 %12 %13 %14 %15 %16 %17 %18")
-			.arg(
-				i.isDir()
-					? 'd'
-					: i.isSymLink()
-						? 'l'
-						: '-')
+			.arg(i.isDir() ? 'd' : '-')
 			.arg(p & QFile::ReadOwner ? 'r' : '-')
 			.arg(p & QFile::WriteOwner ? 'w' : '-')
 			.arg(p & QFile::ExeOwner ? 'x' : '-')
@@ -683,7 +690,7 @@ void neteK::FtpHandler::command_EPSV(QString args)
 		sendLine(200, "Command okay.");
 		return;
 	} else if(args.size() == 0 || args == "1" || args == "2") {
-		// TODO: is 2 (IPv6) really ok? do we need to bind ipv6 addr. as well?
+		// TODO 1.0: is 2 (IPv6) really ok? do we need to bind ipv6 addr. as well?
 	} else {
 		sendLine(522, "Network protocol not supported, use (1,2)");
 		return;
@@ -716,7 +723,7 @@ void neteK::FtpHandler::command_PASV(QString)
 		sendLine(425, "Can't open data connection.");
 	} else {
 		setDataChannel(handler);
-		// TODO: better detection of local address? PASV was obsoleted by EPSV anyway...
+		// TODO 1.0: better detection of local address? PASV was obsoleted by EPSV anyway...
 		quint32 addr = m_control->localAddress().toIPv4Address();
 		sendLine(227, QString("Entering Passive Mode (%1,%2,%3,%4,%5,%6).")
 				.arg((addr>>24)&0xff)
@@ -771,7 +778,7 @@ void neteK::FtpHandler::command_RETR(QString args)
 
 void neteK::FtpHandler::command_STOU(QString)
 {
-	if(m_rest >= 0) {
+	if(m_rest > 0) {
 		// REST unimplemented for STOU, refuse to prevent data corruption
 		sendLine(450, "Requested file action not taken.");
 		return;
@@ -789,7 +796,7 @@ void neteK::FtpHandler::command_STOU(QString)
 
 void neteK::FtpHandler::command_STOR(QString args)
 {
-	if(m_rest >= 0) {
+	if(m_rest > 0) {
 		// REST unimplemented for STOR, refuse to prevent data corruption
 		sendLine(450, "Requested file action not taken.");
 		return;
@@ -846,7 +853,7 @@ QByteArray neteK::FtpHandler::makeLine(QString line)
 {
 	QByteArray out;
 	{
-		QByteArray tmp(line.toUtf8());
+		QByteArray tmp(m_utf8 ? line.toUtf8() : line.toLatin1());
 		foreach(char c, tmp)
 			if(c == '\r') {
 				out.append('\r');
@@ -894,7 +901,7 @@ void neteK::FtpHandler::dataStartStatus(bool ok)
 	if(ok) {
 		if(m_store_unique.size())
 			// RFC says 250, but we are simulating proftpd here
-			sendLine(150, QString("FILE: %1").arg(m_store_unique).toUtf8());
+			sendLine(150, QString("FILE: %1").arg(m_store_unique));
 		else
 			sendLine(150, "File status okay; about to open data connection.");
 	} else {

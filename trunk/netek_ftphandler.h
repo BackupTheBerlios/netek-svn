@@ -127,8 +127,8 @@ class FtpHandler: public QObject {
 	QString m_username;
 	bool m_control_channel_blocked;
 	QString m_cwd;
-	bool m_convert_crlf;
 	qint64 m_rest;
+	bool m_utf8;
 	QString m_store_unique;
 	QString m_rename_from;
 
@@ -140,7 +140,7 @@ class FtpHandler: public QObject {
 	void sendLine(QString line);
 	void sendLine(int code, QString args);
 	void sendLines(int code, QStringList args);
-	bool list(QString path, QFileInfoList &lst);
+	bool list(QString path, QFileInfoList &lst, bool *dir = 0);
 	static QString quotedPath(QString path);
 	static QString month(int m);
 	

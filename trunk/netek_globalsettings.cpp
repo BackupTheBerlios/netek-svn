@@ -6,9 +6,10 @@ neteK::GlobalSettings::GlobalSettings()
 	ui.setupUi(this);
 	
 	Settings settings;
-	ui.publicAddress->setText(settings.publicAddress());
 	ui.tcpFrom->setValue(settings.randomTcpPortMin());
 	ui.tcpTo->setValue(settings.randomTcpPortMax());
+	ui.ftpUseUnicode->setChecked(settings.ftpUseUnicodeByDefault());
+	ui.ftpAllowPassive->setChecked(settings.ftpAllowPassive());
 }
 
 void neteK::GlobalSettings::accept()
@@ -19,9 +20,10 @@ void neteK::GlobalSettings::accept()
 	}
 	
 	Settings settings;
-	settings.setPublicAddress(ui.publicAddress->text());
 	settings.setRandomTcpPortMin(ui.tcpFrom->value());
 	settings.setRandomTcpPortMax(ui.tcpTo->value());
+	settings.setFtpUseUnicodeByDefault(ui.ftpUseUnicode->isChecked());
+	settings.setFtpAllowPassive(ui.ftpAllowPassive->isChecked());
 	
 	QDialog::accept();
 }
