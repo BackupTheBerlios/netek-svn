@@ -24,7 +24,7 @@ make
 
 %install
 rm -fr %{buildroot}
-install -m 755 -D netek %{buildroot}/usr/bin/netek
+install -s -m 755 -D netek %{buildroot}/usr/bin/netek
 install -m 644 -D netek.desktop %{buildroot}/usr/share/applications/netek.desktop
 install -m 644 -D icons/netek.png %{buildroot}/usr/share/pixmaps/netek.png
 
