@@ -1,13 +1,13 @@
 #include "netek_trayicon.h"
 
 // TODO 1.0: transparent X11 icon
-// TODO 1.0: fix gnome systray icon
 // TODO 1.0: include .ico as resource under windows
 
 #ifdef Q_OS_UNIX
 #include <QX11Info>
 #include <X11/Xlib.h>
 #define SYSTEM_TRAY_REQUEST_DOCK    0
+#define XEMBED_EMBEDDED_NOTIFY		0
 #endif
 
 #ifdef Q_OS_WIN32
@@ -54,6 +54,8 @@ class TrayIconX11: public QWidget {
 
 	QPointer<QMainWindow> m_owner;
 	QPixmap m_icon;
+	bool m_docked;
+	Atom m_xembed;
 
 signals:
 	void activated();
@@ -61,9 +63,17 @@ signals:
 
 public:
 	TrayIconX11(QMainWindow *owner)
-	: m_owner(owner), m_icon(QPixmap(":/icons/netek.png"))
+	: m_owner(owner), m_icon(QPixmap(":/icons/netek.png")), m_docked(false)
 	{
+		setAttribute(Qt::WA_DeleteOnClose);
 		setWindowTitle(qApp->applicationName());
+		setMinimumSize(22,22); // a hack for GNOME...
+
+		{
+			TrapErrorsX11 err;
+			m_xembed = XInternAtom(x11Info().display(), "_XEMBED", True);
+		}
+
 		recheck();
 	}
 
@@ -76,13 +86,6 @@ public:
 			return QWidget::event(e);
 
 		return true;
-	}
-
-	void closeEvent(QCloseEvent *e)
-	{
-		hide();
-		scheduleRecheck();
-		e->ignore();
 	}
 
 	void paintEvent(QPaintEvent *)
@@ -102,6 +105,18 @@ public:
 		QWidget::mouseReleaseEvent(e);
 	}
 
+	bool x11Event(XEvent *e)
+	{
+		if(e->type == ClientMessage && e->xclient.message_type == m_xembed) {
+			if(e->xclient.data.l[1] == XEMBED_EMBEDDED_NOTIFY) {
+				m_docked = true;
+				show();
+			}
+		}
+
+		return QWidget::x11Event(e);
+	}
+
 public slots:
 	void scheduleRecheck()
 	{
@@ -111,47 +126,41 @@ public slots:
 
 	void recheck()
 	{
+		if(m_docked)
+			return;
+
+		scheduleRecheck();
+
+		TrapErrorsX11 err;
+
+		Atom a = XInternAtom(x11Info().display(), QString("_NET_SYSTEM_TRAY_S%1").arg(x11Info().appScreen()).toUtf8().data(), True);
+		//qDebug() << "Atom:" << a;
+		if(a == None)
+			return;
+
+		Window w = XGetSelectionOwner(x11Info().display(), a);
+		//qDebug() << "Window:" << w;
+		if(w == None)
+			return;
+
 		{
-			TrapErrorsX11 err;
+			XEvent ev;
 
-			Atom a = XInternAtom(x11Info().display(), QString("_NET_SYSTEM_TRAY_S%1").arg(x11Info().appScreen()).toUtf8().data(), True);
-			//qDebug() << "Atom:" << a;
-			if(a == None) {
-				scheduleRecheck();
-				return;
-			}
+			memset(&ev, 0, sizeof(ev));
+			ev.xclient.type = ClientMessage;
+			ev.xclient.window = w;
+			ev.xclient.message_type = XInternAtom (x11Info().display(), "_NET_SYSTEM_TRAY_OPCODE", False);
+			ev.xclient.format = 32;
+			ev.xclient.data.l[0] = x11Info().appTime();
+			ev.xclient.data.l[1] = SYSTEM_TRAY_REQUEST_DOCK;
+			ev.xclient.data.l[2] = winId();
 
-			Window w = XGetSelectionOwner(x11Info().display(), a);
-			//qDebug() << "Window:" << w;
-			if(w == None) {
-				scheduleRecheck();
-				return;
-			}
-
-			{
-				XEvent ev;
-
-				memset(&ev, 0, sizeof(ev));
-				ev.xclient.type = ClientMessage;
-				ev.xclient.window = w;
-				ev.xclient.message_type = XInternAtom (x11Info().display(), "_NET_SYSTEM_TRAY_OPCODE", False);
-				ev.xclient.format = 32;
-				ev.xclient.data.l[0] = x11Info().appTime();
-				ev.xclient.data.l[1] = SYSTEM_TRAY_REQUEST_DOCK;
-				ev.xclient.data.l[2] = winId();
-
-				XSendEvent(x11Info().display(), w, False, NoEventMask, &ev);
-				XSync(x11Info().display(), False);
-			}
-
-			if(err) {
-				scheduleRecheck();
-				return;
-			}
+			XSendEvent(x11Info().display(), w, False, NoEventMask, &ev);
+			XSync(x11Info().display(), False);
 		}
-
-		show();
 	}
+
+
 };
 #endif
 
