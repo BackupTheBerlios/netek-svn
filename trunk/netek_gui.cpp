@@ -57,8 +57,10 @@ neteK::Gui::Gui()
 	
 	{
 		QRect geom = Settings().guiGeometry();
-		resize(geom.size());
-		move(geom.topLeft());
+		if(geom.isValid()) {
+			resize(geom.size());
+			move(geom.topLeft());
+		}
 	}
 
 	if(!m_icon)
