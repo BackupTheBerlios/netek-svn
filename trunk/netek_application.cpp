@@ -26,6 +26,8 @@ neteK::Application::Application(int &argc, char **argv)
 	setQuitOnLastWindowClosed(false);
 
 #ifdef Q_OS_UNIX
+	setStyle(new QPlastiqueStyle);
+
 	foreach(QString path, autostarts()) {
 		QFile(path).remove();
 		QFile(applicationFilePath()).link(path);
@@ -33,12 +35,12 @@ neteK::Application::Application(int &argc, char **argv)
 #endif
 
 #ifdef Q_OS_WIN32
-    HKEY key;
-    if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
-        std::wstring str(applicationFilePath().toStdWString());
-        RegSetValueEx(key, subkey, 0, REG_SZ, (const BYTE*)str.c_str(), str.size() * sizeof(wchar_t));
-        RegCloseKey(key);
-    }
+	HKEY key;
+	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
+		std::wstring str(applicationFilePath().toStdWString());
+		RegSetValueEx(key, subkey, 0, REG_SZ, (const BYTE*)str.c_str(), str.size() * sizeof(wchar_t));
+		RegCloseKey(key);
+	}
 #endif
 }
 
@@ -50,11 +52,11 @@ void neteK::Application::userQuit()
 #endif
 
 #ifdef Q_OS_WIN32
-    HKEY key;
-    if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
-        RegDeleteValue(key, subkey);
-        RegCloseKey(key);
-    }
+	HKEY key;
+	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
+		RegDeleteValue(key, subkey);
+		RegCloseKey(key);
+	}
 #endif
 
 	quit();
