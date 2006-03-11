@@ -46,6 +46,8 @@ class Share: public QObject {
 
 		bool readOnly() const;
 		void setReadOnly(bool yes);
+		
+		QString URLProtocol() const;
 
 		enum Access { AccessAnonymous, AccessUsernamePassword };
 		Access access() const;

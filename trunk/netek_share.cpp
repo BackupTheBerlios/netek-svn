@@ -8,6 +8,11 @@ neteK::Share::Share()
 : m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_client_count(0)
 { }
 
+QString neteK::Share::URLProtocol() const
+{
+	return "ftp";
+}
+
 bool neteK::Share::readOnly() const
 {
 	return m_readonly;

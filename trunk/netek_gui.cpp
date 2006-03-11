@@ -4,11 +4,123 @@
 #include "netek_globalsettings.h"
 #include "netek_trayicon.h"
 #include "netek_settings.h"
+#include "netek_netutils.h"
 
 // TODO 1.1: zeroconf
 // TODO 1.1: upnp
 // TODO 1.1: add logging of events
 // TODO 1.0: mac os x port
+
+namespace neteK {
+
+class CopyLinkMenu: public QMenu {
+	Q_OBJECT;
+	
+	QString m_protocol;
+	quint16 m_port;
+	QPointer<QAction> m_public;
+	QIcon m_icon;
+	
+	QString link(QString addr)
+	{
+		return QString("%1://%2:%3")
+			.arg(m_protocol)
+			.arg(addr)
+			.arg(m_port);
+	}
+	
+	QString link(QHostAddress addr)
+	{
+		return QString("%1://%2:%3")
+			.arg(m_protocol)
+			.arg(addr.toString())
+			.arg(m_port);
+	}
+	
+	void setPublic(QString text)
+	{
+		if(m_public) {
+			m_public->setIcon(m_icon);
+			m_public->setText(text);
+			
+			QFont font = m_public->font();
+			font.setItalic(false);
+			m_public->setFont(font);
+			
+			m_public = 0;
+		}
+	}
+	
+public slots:
+	void resolved(QHostAddress addr)
+	{
+		if(!m_public)
+			return;
+			
+		if(addr.isNull())
+			m_public->setText(tr("Autodetect failed"));
+		else
+			setPublic(link(addr));
+	}
+	
+	void copy(QAction *a)
+	{
+		if(a != m_public)
+			qApp->clipboard()->setText(a->text());
+	}
+	
+public:
+	CopyLinkMenu(QString prot, quint16 port)
+	: m_protocol(prot), m_port(port), m_icon(QPixmap(":/icons/www.png"))
+	{
+		connect(this, SIGNAL(triggered(QAction*)), SLOT(copy(QAction*)));
+		
+		setTitle(tr("Copy &link"));
+		setIcon(m_icon);
+		
+		m_public = addAction(tr("Autodetecting public address..."));
+		{
+			QFont font = m_public->font();
+			font.setItalic(true);
+			m_public->setFont(font);
+		}
+		
+		QList<QPair<QString, QHostAddress> > nifs;
+		if(networkInterfaces(nifs)) {
+			QMap<int, QList<QHostAddress> > sorted;
+			QList<QPair<QString, QHostAddress> >::iterator nif;
+			for(nif = nifs.begin(); nif != nifs.end(); ++nif) {
+				int idx = 3;
+				
+				if(nif->second.protocol() == QAbstractSocket::IPv4Protocol) {
+					if(isLoopback(nif->second))
+						continue;
+						
+					if(isPublicNetwork(nif->second))
+						idx = 0;
+					else if(isPrivateNetwork(nif->second))
+						idx = 1;
+					else
+						idx = 2;
+						
+					sorted[idx].append(nif->second);
+				}
+			}
+			
+			foreach(QList<QHostAddress> alist, sorted)
+				foreach(QHostAddress addr, alist)
+					addAction(m_icon, link(addr));
+		}
+		
+		Settings settings;
+		if(settings.publicAddress() == Settings::PublicAddressManual)
+			setPublic(link(settings.customPublicAddress()));
+		else
+			resolvePublicAddress(QHostAddress(), this, SLOT(resolved(QHostAddress)));
+	}
+};
+
+}
 
 neteK::Gui::Gui()
 : m_save_geometry_timer(false)
@@ -24,12 +136,10 @@ neteK::Gui::Gui()
 
 	m_shares = new Shares;
 	m_shares->setParent(this);
-
-	ui.shareList->addAction(ui.actionSettings);
-	ui.shareList->addAction(ui.actionStart);
-	ui.shareList->addAction(ui.actionStop);
-	ui.shareList->addAction(ui.actionDelete);
-	ui.shareList->setContextMenuPolicy(Qt::ActionsContextMenu);
+	
+	ui.shareList->setContextMenuPolicy(Qt::CustomContextMenu);
+	
+	connect(ui.shareList, SIGNAL(customContextMenuRequested(const QPoint &)), SLOT(shareMenu(const QPoint &)));
 
 	connect(m_shares, SIGNAL(changed()), SLOT(sharesChanged()));
 
@@ -41,6 +151,7 @@ neteK::Gui::Gui()
 	connect(ui.settings, SIGNAL(clicked()), SLOT(shareSettings()));
 	connect(ui.start, SIGNAL(clicked()), SLOT(startShare()));
 	connect(ui.stop, SIGNAL(clicked()), SLOT(stopShare()));
+	connect(ui.copyLink, SIGNAL(clicked()), SLOT(copyLinkMenu()));
 
 	connect(ui.action_FTP_shares, SIGNAL(triggered()), SLOT(toggleVisible()));
 	connect(ui.action_Create_share, SIGNAL(triggered()), m_shares, SLOT(createShareWithSettings()));
@@ -117,6 +228,26 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 	menu.addAction(ui.action_Quit);
 
 	menu.exec(pos);
+}
+	
+void neteK::Gui::shareMenu(const QPoint &)
+{
+	QPointer<Share> sh = currentShare();
+	if(sh && sh->status() != Share::StatusUnconfigured) {
+		CopyLinkMenu cmenu(sh->URLProtocol(), sh->port());
+		QMenu menu;
+		menu.addMenu(&cmenu);
+			
+		menu.addAction(ui.actionSettings);
+		menu.addAction(ui.actionStart);
+		menu.addAction(ui.actionStop);
+		menu.addAction(ui.actionDelete);
+		
+		ui.actionStart->setEnabled(!sh->runStatus());
+		ui.actionStop->setEnabled(sh->runStatus());
+		
+		menu.exec(QCursor::pos());
+	}
 }
 
 neteK::Share *neteK::Gui::currentShare()
@@ -220,14 +351,12 @@ void neteK::Gui::sharesChanged()
 
 	{
 		QPointer<Share> sh = currentShare();
-		ui.actionDelete->setEnabled(sh);
-		ui.actionSettings->setEnabled(sh);
-		ui.actionStart->setEnabled(sh && !sh->runStatus());
-		ui.actionStop->setEnabled(sh && sh->runStatus());
-		ui.deleteShare->setEnabled(sh);
-		ui.settings->setEnabled(sh);
-		ui.start->setEnabled(sh && !sh->runStatus());
-		ui.stop->setEnabled(sh && sh->runStatus());
+		bool ok = sh && sh->status() != Share::StatusUnconfigured;
+		ui.deleteShare->setEnabled(ok);
+		ui.settings->setEnabled(ok);
+		ui.start->setEnabled(ok && !sh->runStatus());
+		ui.stop->setEnabled(ok && sh->runStatus());
+		ui.copyLink->setEnabled(ok);
 	}
 }
 
@@ -235,3 +364,14 @@ void neteK::Gui::globalSettings()
 {
 	GlobalSettings().exec();
 }
+
+void neteK::Gui::copyLinkMenu()
+{
+	QPointer<Share> sh = currentShare();
+	if(sh) {
+		CopyLinkMenu menu(sh->URLProtocol(), sh->port());
+		menu.exec(QCursor::pos());
+	}
+}
+
+#include "netek_gui.moc"

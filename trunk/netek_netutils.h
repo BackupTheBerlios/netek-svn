@@ -7,7 +7,13 @@
 namespace neteK {
 
 	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
+	
+	bool isPrivateNetwork(QHostAddress addr);
+	bool isLoopback(QHostAddress addr);
+	bool isOtherNonPublic(QHostAddress addr);
 	bool isPublicNetwork(QHostAddress addr);
+	
+	bool networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs);
 
 }
 

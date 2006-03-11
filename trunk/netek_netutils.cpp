@@ -2,7 +2,14 @@
 #include "netek_settings.h"
 
 // TODO 1.0: provide settings for autodetect timeouts...?
-// TODO 1.0: more test for autodetection
+// TODO 1.0: more tests for autodetection
+// TODO 1.0: win32 port of networkInterfaces
+
+#ifdef Q_OS_UNIX
+#include <sys/types.h> 
+#include <sys/socket.h> 
+#include <ifaddrs.h> 
+#endif
 
 namespace neteK {
 
@@ -133,18 +140,66 @@ void neteK::resolvePublicAddress(QHostAddress def, QObject *rec, const char *slo
 	det->start();
 }
 
+bool neteK::isLoopback(QHostAddress addr)
+{
+	if(addr.protocol() == QAbstractSocket::IPv4Protocol) {
+		return (addr.toIPv4Address() & 0xff000000) == 0x7f000000;
+	}
+	
+	return false;
+}
+
+bool neteK::isOtherNonPublic(QHostAddress addr)
+{
+	if(addr.protocol() == QAbstractSocket::IPv4Protocol) {
+		return (addr.toIPv4Address() & 0xffff0000) == 0xa9fe0000;
+	}
+	
+	return false;
+}
+
+bool neteK::isPrivateNetwork(QHostAddress addr)
+{
+	if(addr.protocol() == QAbstractSocket::IPv4Protocol) {
+		quint32 a = addr.toIPv4Address();
+		return
+			((a & 0xff000000) == 0x0a000000) ||
+			((a & 0xfff00000) == 0xac100000) ||
+			((a & 0xffff0000) == 0xc0a80000);
+	}
+	
+	return false;
+}
+
 bool neteK::isPublicNetwork(QHostAddress addr)
 {
-	if(addr.protocol() != QAbstractSocket::IPv4Protocol)
-		return true;
-		
-	quint32 a = addr.toIPv4Address();
 	return
-		(a & 0xff000000) != 0x0a000000 &&
-		(a & 0xfff00000) != 0xac100000 &&
-		(a & 0xffff0000) != 0xc0a80000 &&
-		(a & 0xffff0000) != 0xa9fe0000 &&
-		(a & 0xff000000) != 0x7f000000;
+		!isLoopback(addr)
+		&& !isOtherNonPublic(addr)
+		&& !isPrivateNetwork(addr);
+}
+
+bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
+{
+#ifdef Q_OS_UNIX
+	ifaddrs *ifa;
+	if(0 == getifaddrs(&ifa)) {
+		for(ifaddrs *nif = ifa; nif != 0; nif = nif->ifa_next) {
+			if(nif->ifa_name && nif->ifa_addr) {
+				QHostAddress addr;
+				addr.setAddress(nif->ifa_addr);
+				
+				if(!addr.isNull())
+					nifs.append(qMakePair(QString(nif->ifa_name), addr));
+			}
+		}
+		
+		freeifaddrs(ifa);
+		return true;
+	}
+#endif
+
+	return false;
 }
 
 #include "netek_netutils.moc"

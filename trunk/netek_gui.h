@@ -44,6 +44,8 @@ public slots:
 	void toggleVisible();
 	void trayMenu(const QPoint &pos);
 	void saveGeometry();
+	void copyLinkMenu();
+	void shareMenu(const QPoint &pos);
 };
 
 }
