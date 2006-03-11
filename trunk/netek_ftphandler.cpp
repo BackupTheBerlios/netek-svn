@@ -4,8 +4,8 @@
 
 // TODO 1.0: no space left on disk test
 // TODO 1.1: fix socket speed - unbuffered sockets?
-// TODO 1.0: ipv6 support
-// TODO 1.0: public address support
+// TODO 1.1: ipv6 support
+// TODO 1.0: site chmod
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
@@ -241,11 +241,6 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	
 	m_control->setParent(this);
 
-	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
-	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
-	connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
-	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
-
 #define ADD_COMMAND(_cmd, _flags) addCommand(&FtpHandler::command_ ## _cmd, #_cmd, (_flags))
 	ADD_COMMAND(USER, 0);
 	ADD_COMMAND(PASS, 0);
@@ -294,8 +289,6 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	if(settings.ftpAllowPassive())
 		ADD_COMMAND(EPSV, CommandFlagLoggedIn);
 #undef ADD_COMMAND
-
-	init();
 }
 
 void neteK::FtpHandler::init()
@@ -312,6 +305,20 @@ void neteK::FtpHandler::init()
 	closeDataChannel();
 
 	sendLine(220, QCoreApplication::applicationName());
+	
+	emit processSignal();
+}
+
+void neteK::FtpHandler::start(QHostAddress publ)
+{
+	m_public = publ;
+	
+	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
+	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
+	connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
+	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
+	
+	init();
 }
 
 bool neteK::FtpHandler::list(QString path, QFileInfoList &lst, bool *dir)
@@ -690,7 +697,7 @@ void neteK::FtpHandler::command_EPSV(QString args)
 		sendLine(200, "Command okay.");
 		return;
 	} else if(args.size() == 0 || args == "1" || args == "2") {
-		// TODO 1.0: is 2 (IPv6) really ok? do we need to bind ipv6 addr. as well?
+		// TODO 1.1: is 2 (IPv6) really ok? do we need to bind ipv6 addr. as well?
 	} else {
 		sendLine(522, "Network protocol not supported, use (1,2)");
 		return;
@@ -713,7 +720,7 @@ void neteK::FtpHandler::command_PASV(QString)
 {
 	if(!m_control)
 		return;
-
+		
 	quint16 port;
 	QPointer<FtpHandlerPASV> handler(new FtpHandlerPASV(m_control->peerAddress(), port));
 	if(port == 0) {
@@ -723,8 +730,7 @@ void neteK::FtpHandler::command_PASV(QString)
 		sendLine(425, "Can't open data connection.");
 	} else {
 		setDataChannel(handler);
-		// TODO 1.0: better detection of local address? PASV was obsoleted by EPSV anyway...
-		quint32 addr = m_control->localAddress().toIPv4Address();
+		quint32 addr = m_public.toIPv4Address();
 		sendLine(227, QString("Entering Passive Mode (%1,%2,%3,%4,%5,%6).")
 				.arg((addr>>24)&0xff)
 				.arg((addr>>16)&0xff)
@@ -943,7 +949,7 @@ void neteK::FtpHandler::process()
 
 	if(m_control)
 		while(m_control->canReadLine()) {
-			QString line = QString::fromUtf8(m_control->readLine(500000).constData());
+			QString line = QString::fromUtf8(m_control->readLine(10000).constData());
 			while(line.endsWith('\r') || line.endsWith('\n'))
 				line.chop(1);
 

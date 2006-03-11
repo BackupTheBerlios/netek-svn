@@ -13,8 +13,13 @@ public:
 	quint16 randomTcpPortMax();
 	void setRandomTcpPortMax(quint16 port);
 	
-	QString publicAddress();
-	void setPublicAddress(QString addr);
+	enum PublicAddress { PublicAddressAutodetect, PublicAddressManual };
+	
+	PublicAddress publicAddress();
+	void setPublicAddress(PublicAddress a);
+	
+	QString customPublicAddress();
+	void setCustomPublicAddress(QString addr);
 	
 	QRect guiGeometry();
 	void setGuiGeometry(QRect rect);

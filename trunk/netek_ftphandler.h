@@ -131,6 +131,7 @@ class FtpHandler: public QObject {
 	bool m_utf8;
 	QString m_store_unique;
 	QString m_rename_from;
+	QHostAddress m_public;
 
 	void init();
 	void closeDataChannel();
@@ -153,6 +154,9 @@ private slots:
 	void dataStartStatus(bool ok);
 	void dataTransferStatus(bool ok);
 
+public slots:
+	void start(QHostAddress publ);
+	
 public:
 	FtpHandler(Share *s, QAbstractSocket *control);
 };

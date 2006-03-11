@@ -21,6 +21,8 @@ neteK::Shares::Shares()
 		s->setUsernamePassword(
 				settings.value("username").toString(),
 				settings.value("password").toString());
+				
+		s->checkServer();
 	}
 	settings.endArray();
 }

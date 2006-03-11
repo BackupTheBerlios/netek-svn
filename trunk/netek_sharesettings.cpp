@@ -22,21 +22,16 @@ neteK::ShareSettings::ShareSettings(Share *share)
 	ui.readOnly->setChecked(m_share->readOnly());
 	ui.anonymous->setChecked(m_share->access() == Share::AccessAnonymous);
 	ui.authentication->setChecked(m_share->access() == Share::AccessUsernamePassword);
-
+	connect(ui.anonymous, SIGNAL(clicked()), SLOT(securityRadio()));
+	connect(ui.authentication, SIGNAL(clicked()), SLOT(securityRadio()));
+	
 	{
 		QString u, p;
 		m_share->usernamePassword(u,p);
 		ui.username->setText(u);
 		ui.password->setText(p);
 	}
-
-	{
-		QButtonGroup *up = new QButtonGroup(this);
-		up->addButton(ui.anonymous);
-		up->addButton(ui.authentication);
-		connect(up, SIGNAL(buttonClicked(QAbstractButton*)), SLOT(securityRadio()));
-	}
-
+	
 	securityRadio();
 }
 
@@ -97,12 +92,13 @@ void neteK::ShareSettings::accept()
 
 	m_share->setReadOnly(ui.readOnly->isChecked());
 
-	if(ui.anonymous->isChecked())
-		m_share->setAccess(Share::AccessAnonymous);
-	if(ui.authentication->isChecked())
+	if(ui.authentication->isChecked()) {
 		m_share->setAccess(Share::AccessUsernamePassword);
-
-	m_share->setUsernamePassword(ui.username->text(), ui.password->text());
+		m_share->setUsernamePassword(ui.username->text(), ui.password->text());
+	} else {
+		m_share->setUsernamePassword("", "");
+		m_share->setAccess(Share::AccessAnonymous);
+	}
 
 	QDialog::accept();
 }

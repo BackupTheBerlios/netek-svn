@@ -182,6 +182,19 @@ void neteK::Gui::sharesChanged()
 			}
 
 			QString desc(sh->niceId());
+			
+			{
+				QString flags;
+				if(sh->readOnly())
+					flags += 'R';
+				if(sh->access() == Share::AccessUsernamePassword)
+					flags += 'U';
+				if(flags.size())
+					desc += QString(" (%1)").arg(flags);
+				else
+					desc += " (-)";
+			}
+			
 			desc += tr(", ");
 
 			switch(sh->status()) {

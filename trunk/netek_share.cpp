@@ -2,20 +2,11 @@
 #include "netek_settings.h"
 #include "netek_sharesettings.h"
 #include "netek_ftphandler.h"
+#include "netek_netutils.h"
 
 neteK::Share::Share()
 : m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_client_count(0)
-{
-	{
-		QTimer *timer = new QTimer(this);
-		connect(timer, SIGNAL(timeout()), SLOT(checkServer()));
-		timer->start(10000);
-	}
-
-	connect(this, SIGNAL(recheckServer()), SLOT(checkServer()), Qt::QueuedConnection);
-
-	emit recheckServer();
-}
+{ }
 
 bool neteK::Share::readOnly() const
 {
@@ -89,12 +80,21 @@ void neteK::Share::handleNewClient()
 		if(!client)
 			break;
 
-		QPointer<FtpHandler> handler = new FtpHandler(this, client);
-		handler->setParent(this);
-		connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
-		connect(m_server, SIGNAL(destroyed()), handler, SLOT(deleteLater()));
-
 		++m_client_count;
+		connect(client, SIGNAL(destroyed()), SLOT(clientGone()));
+		
+		QPointer<FtpHandler> handler = new FtpHandler(this, client);
+		handler->setParent(m_server);
+
+		{
+			QHostAddress local = client->localAddress();
+			
+			if(!isPublicNetwork(local) && isPublicNetwork(client->peerAddress()))
+				resolvePublicAddress(local, handler, SLOT(start(QHostAddress)));
+			else
+				handler->start(local);
+		}
+			
 		emit statusChanged();
 	}
 }
@@ -114,6 +114,7 @@ void neteK::Share::checkServer()
 		if(!m_server->listen(QHostAddress::Any, m_port)) {
 			m_server->deleteLater();
 			m_server = 0;
+			QTimer::singleShot(1000, this, SLOT(checkServer()));
 		}
 	} else if(!m_run && m_server) {
 		m_server->deleteLater();
@@ -130,7 +131,7 @@ void neteK::Share::restartIfStarted()
 		m_server = 0;
 	}
 
-	emit recheckServer();
+	checkServer();
 }
 
 void neteK::Share::startIfStopped()

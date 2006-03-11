@@ -12,11 +12,17 @@ quint16 neteK::Settings::randomTcpPortMax()
 void neteK::Settings::setRandomTcpPortMax(quint16 port)
 { setValue("randomTcpPort/max", port); }
 
-QString neteK::Settings::publicAddress()
-{ return value("publicAddress").toString(); }
+neteK::Settings::PublicAddress neteK::Settings::publicAddress()
+{ return (PublicAddress)value("publicAddress", PublicAddressAutodetect).toInt(); }
 
-void neteK::Settings::setPublicAddress(QString addr)
-{ setValue("publicAddress", addr); }
+void neteK::Settings::setPublicAddress(PublicAddress a)
+{ setValue("publicAddress", a); }
+
+QString neteK::Settings::customPublicAddress()
+{ return value("customPublicAddress").toString(); }
+
+void neteK::Settings::setCustomPublicAddress(QString addr)
+{ setValue("customPublicAddress", addr); }
 
 void neteK::Settings::setGuiGeometry(QRect rect)
 { setValue("gui/geometry", rect); }

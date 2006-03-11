@@ -1,7 +1,8 @@
 #include "netek_trayicon.h"
 
-// TODO 1.0: transparent X11 icon
-// TODO 1.0: include .ico as resource under windows
+// TODO 1.1: transparent X11 icon
+// TODO 1.1: include .ico as resource under windows
+// TODO 1.1: blinking indicator
 
 #ifdef Q_OS_UNIX
 #include <QX11Info>
@@ -120,8 +121,8 @@ public:
 public slots:
 	void scheduleRecheck()
 	{
-		//qWarning("Trying to create tray icon in 3 seconds...");
-		QTimer::singleShot(3000, this, SLOT(recheck()));
+		//qWarning("Trying to create tray icon in 1 second...");
+		QTimer::singleShot(1000, this, SLOT(recheck()));
 	}
 
 	void recheck()
