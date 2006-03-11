@@ -1,7 +1,7 @@
 Summary: system tray application for creating FTP and webdav shares
 Name: netek
 Version: 0.8.0
-Release: 0
+Release: 1
 License: GPL
 Group: Applications/Internet
 Source: netek-%{version}.tar.bz2
