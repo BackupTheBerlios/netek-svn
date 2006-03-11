@@ -1,0 +1,2 @@
+#! /bin/sh
+echo -ne "Content-Type: text/plain\n\n${REMOTE_ADDR}\n"
