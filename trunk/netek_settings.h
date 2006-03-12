@@ -24,6 +24,9 @@ public:
 	QRect guiGeometry();
 	void setGuiGeometry(QRect rect);
 	
+	QList<int> guiShareListColumns();
+	void setGuiShareListColumns(QList<int> slc);
+	
 	bool ftpUseUnicodeByDefault();
 	void setFtpUseUnicodeByDefault(bool yes);
 	

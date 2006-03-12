@@ -4,7 +4,6 @@
 
 // TODO 1.0: no space left on disk test
 // TODO 1.1: fix socket speed - unbuffered sockets?
-// TODO 1.1: ipv6 support
 // TODO 1.0: site chmod
 
 neteK::FtpHandlerData::FtpHandlerData()

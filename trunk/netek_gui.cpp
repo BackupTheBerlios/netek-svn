@@ -6,10 +6,7 @@
 #include "netek_settings.h"
 #include "netek_netutils.h"
 
-// TODO 1.1: zeroconf
-// TODO 1.1: upnp
 // TODO 1.1: add logging of events
-// TODO 1.0: mac os x port
 
 namespace neteK {
 
@@ -31,10 +28,7 @@ class CopyLinkMenu: public QMenu {
 	
 	QString link(QHostAddress addr)
 	{
-		return QString("%1://%2:%3")
-			.arg(m_protocol)
-			.arg(addr.toString())
-			.arg(m_port);
+		return link(addr.toString());
 	}
 	
 	void setPublic(QString text)
@@ -48,6 +42,8 @@ class CopyLinkMenu: public QMenu {
 			m_public->setFont(font);
 			
 			m_public = 0;
+			
+			adjustSize();
 		}
 	}
 	
@@ -57,9 +53,10 @@ public slots:
 		if(!m_public)
 			return;
 			
-		if(addr.isNull())
+		if(addr.isNull()) {
 			m_public->setText(tr("Autodetect failed"));
-		else
+			adjustSize();
+		} else
 			setPublic(link(addr));
 	}
 	
@@ -75,7 +72,7 @@ public:
 	{
 		connect(this, SIGNAL(triggered(QAction*)), SLOT(copy(QAction*)));
 		
-		setTitle(tr("Copy &link"));
+		setTitle(tr("Copy link"));
 		setIcon(m_icon);
 		
 		m_public = addAction(tr("Autodetecting public address..."));
@@ -109,7 +106,7 @@ public:
 			
 			foreach(QList<QHostAddress> alist, sorted)
 				foreach(QHostAddress addr, alist)
-					addAction(m_icon, link(addr));
+					addAction(m_icon, link(addr));						
 		}
 		
 		Settings settings;
@@ -139,28 +136,23 @@ neteK::Gui::Gui()
 	
 	ui.shareList->setContextMenuPolicy(Qt::CustomContextMenu);
 	
-	connect(ui.shareList, SIGNAL(customContextMenuRequested(const QPoint &)), SLOT(shareMenu(const QPoint &)));
+	connect(ui.shareList, SIGNAL(customContextMenuRequested(const QPoint &)), SLOT(shareMenu()));
 
 	connect(m_shares, SIGNAL(changed()), SLOT(sharesChanged()));
 
-	connect(ui.shareList, SIGNAL(itemSelectionChanged()), SLOT(sharesChanged()), Qt::QueuedConnection);
-	connect(ui.shareList, SIGNAL(itemActivated(QListWidgetItem *)), SLOT(toggleRunStatus()));
-
-	connect(ui.create, SIGNAL(clicked()), m_shares, SLOT(createShareWithSettings()));
-	connect(ui.deleteShare, SIGNAL(clicked()), SLOT(deleteShare()));
-	connect(ui.settings, SIGNAL(clicked()), SLOT(shareSettings()));
-	connect(ui.start, SIGNAL(clicked()), SLOT(startShare()));
-	connect(ui.stop, SIGNAL(clicked()), SLOT(stopShare()));
-	connect(ui.copyLink, SIGNAL(clicked()), SLOT(copyLinkMenu()));
+	connect(ui.shareList, SIGNAL(currentItemChanged(QTreeWidgetItem *,QTreeWidgetItem *)), SLOT(sharesChanged()), Qt::QueuedConnection);
+	connect(ui.shareList, SIGNAL(itemActivated(QTreeWidgetItem *, int)), SLOT(toggleRunStatus()));
 
 	connect(ui.action_FTP_shares, SIGNAL(triggered()), SLOT(toggleVisible()));
 	connect(ui.action_Create_share, SIGNAL(triggered()), m_shares, SLOT(createShareWithSettings()));
+	connect(ui.action_Create, SIGNAL(triggered()), m_shares, SLOT(createShareWithSettings()));
 	connect(ui.actionSettings, SIGNAL(triggered()), SLOT(shareSettings()));
 	connect(ui.actionStart, SIGNAL(triggered()), SLOT(startShare()));
 	connect(ui.actionStop, SIGNAL(triggered()), SLOT(stopShare()));
 	connect(ui.actionDelete, SIGNAL(triggered()), SLOT(deleteShare()));
 	connect(ui.action_Global_settings, SIGNAL(triggered()), SLOT(globalSettings()));
 	connect(ui.action_Quit, SIGNAL(triggered()), SIGNAL(quit()));
+	connect(ui.actionCopy_link, SIGNAL(triggered()), SLOT(copyLinkMenu()));
 
 	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
 
@@ -172,6 +164,18 @@ neteK::Gui::Gui()
 			resize(geom.size());
 			move(geom.topLeft());
 		}
+	}
+	
+	{
+		QPointer<QHeaderView> h = ui.shareList->header();
+		h->setStretchLastSection(false);
+				
+		QList<int> cwidth = Settings().guiShareListColumns();
+		for(int i=0; i<cwidth.size(); ++i)
+			if(cwidth.at(i) > 0)
+				h->resizeSection(i, cwidth.at(i));
+				
+		connect(h, SIGNAL(sectionResized(int,int,int)), SLOT(saveGeometryTimer()));
 	}
 
 	if(!m_icon)
@@ -203,8 +207,15 @@ void neteK::Gui::saveGeometryTimer()
 
 void neteK::Gui::saveGeometry()
 {
+	Settings settings;
 	m_save_geometry_timer = false;
-	Settings().setGuiGeometry(QRect(pos(), size()));
+	settings.setGuiGeometry(QRect(pos(), size()));
+	
+	QList<int> slc;
+	for(int i=0; i<ui.shareList->columnCount(); ++i)
+		slc.append(ui.shareList->columnWidth(i));
+		
+	settings.setGuiShareListColumns(slc);
 }
 
 void neteK::Gui::toggleVisible()
@@ -230,21 +241,16 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 	menu.exec(pos);
 }
 	
-void neteK::Gui::shareMenu(const QPoint &)
+void neteK::Gui::shareMenu()
 {
 	QPointer<Share> sh = currentShare();
 	if(sh && sh->status() != Share::StatusUnconfigured) {
-		CopyLinkMenu cmenu(sh->URLProtocol(), sh->port());
 		QMenu menu;
-		menu.addMenu(&cmenu);
-			
+		menu.addAction(ui.actionCopy_link);
 		menu.addAction(ui.actionSettings);
 		menu.addAction(ui.actionStart);
 		menu.addAction(ui.actionStop);
 		menu.addAction(ui.actionDelete);
-		
-		ui.actionStart->setEnabled(!sh->runStatus());
-		ui.actionStop->setEnabled(sh->runStatus());
 		
 		menu.exec(QCursor::pos());
 	}
@@ -252,7 +258,7 @@ void neteK::Gui::shareMenu(const QPoint &)
 
 neteK::Share *neteK::Gui::currentShare()
 {
-	return m_shares->share(ui.shareList->currentRow());
+	return m_shares->share(ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
 }
 
 void neteK::Gui::shareSettings()
@@ -264,7 +270,7 @@ void neteK::Gui::shareSettings()
 
 void neteK::Gui::deleteShare()
 {
-	m_shares->deleteShareWithQuestion(ui.shareList->currentRow());
+	m_shares->deleteShareWithQuestion(ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
 }
 
 void neteK::Gui::startShare()
@@ -294,25 +300,36 @@ void neteK::Gui::toggleRunStatus()
 
 void neteK::Gui::sharesChanged()
 {
-	while(ui.shareList->count() > m_shares->shares())
-		delete ui.shareList->takeItem(ui.shareList->count()-1);
+	while(ui.shareList->topLevelItemCount() > m_shares->shares())
+		delete ui.shareList->takeTopLevelItem(ui.shareList->topLevelItemCount()-1);
 
 	for(int i=0; i<m_shares->shares(); ++i) {
 		QPointer<Share> sh = m_shares->share(i);
 		if(sh) {
-			QListWidgetItem *item;
-			if(i < ui.shareList->count()) {
-				item = ui.shareList->item(i);
-				Q_ASSERT(item);
-			} else {
-				item = new QListWidgetItem;
-				ui.shareList->addItem(item);
-				QFont font = item->font();
-				font.setBold(true);
-				item->setFont(font);
+			QTreeWidgetItem *item;
+			if(i < ui.shareList->topLevelItemCount())
+				item = ui.shareList->topLevelItem(i);
+			else {
+				item = new QTreeWidgetItem;
+				item->setTextAlignment(0, Qt::AlignLeft | Qt::AlignVCenter);
+				item->setTextAlignment(1, Qt::AlignCenter);
+				item->setTextAlignment(2, Qt::AlignCenter);
+				item->setTextAlignment(3, Qt::AlignCenter);
+				item->setTextAlignment(4, Qt::AlignCenter);
+				
+				/*{
+					QFont font = item->font(0);
+					font.setPointSize(font.pointSize()+1);
+					font.setBold(true);
+					for(int j=0; j<ui.shareList->columnCount(); ++j)
+						item->setFont(j, font);
+				}*/
+				
+				ui.shareList->addTopLevelItem(item);
 			}
-
-			QString desc(sh->niceId());
+			
+			item->setText(0, /*" " +*/ sh->folder());
+			item->setText(1, QString::number(sh->port()));
 			
 			{
 				QString flags;
@@ -320,43 +337,53 @@ void neteK::Gui::sharesChanged()
 					flags += 'R';
 				if(sh->access() == Share::AccessUsernamePassword)
 					flags += 'U';
+				
 				if(flags.size())
-					desc += QString(" (%1)").arg(flags);
+					item->setText(2, flags);
 				else
-					desc += " (-)";
+					item->setText(2, "-");
 			}
 			
-			desc += tr(", ");
-
+			QPixmap icon;
+			QColor bg;
+			QString status;
 			switch(sh->status()) {
 				case Share::StatusStarted:
-					item->setIcon(QPixmap(":/icons/folder_open.png"));
-					desc += tr("started");
+					status = tr("started");
+					bg = QColor(0xff, 0xff, 0xff);
+					icon = QPixmap(":/icons/folder_open.png");
 					break;
 				case Share::StatusStopped:
-					item->setIcon(QPixmap(":/icons/folder_grey.png"));
-					desc += tr("stopped");
+					status = tr("stopped");
+					bg = QColor(0xcc, 0xcc, 0xcc);
+					icon = QPixmap(":/icons/folder_grey.png");
 					break;
 				default:
-					item->setIcon(QPixmap(":/icons/exec.png"));
-					desc += tr("processing");
+					status = tr("processing");
+					bg = QColor(0xff, 0x99, 0x99);
+					icon = QPixmap(":/icons/exec.png");
 			}
-
+			
+			item->setIcon(0, icon);
+			item->setText(3, status);
+			item->setText(4, QString::number(sh->clients()));
+			
 			if(sh->clients())
-				desc += QString(", clients: %1").arg(sh->clients());
-
-			item->setText(desc);
+				bg = QColor(0xff, 0xff, 0x66);
+				
+			for(int j=0; j<ui.shareList->columnCount(); ++j)
+				item->setBackgroundColor(j, bg);
 		}
 	}
-
+	
 	{
 		QPointer<Share> sh = currentShare();
 		bool ok = sh && sh->status() != Share::StatusUnconfigured;
-		ui.deleteShare->setEnabled(ok);
-		ui.settings->setEnabled(ok);
-		ui.start->setEnabled(ok && !sh->runStatus());
-		ui.stop->setEnabled(ok && sh->runStatus());
-		ui.copyLink->setEnabled(ok);
+		ui.actionDelete->setEnabled(ok);
+		ui.actionSettings->setEnabled(ok);
+		ui.actionStart->setEnabled(ok && !sh->runStatus());
+		ui.actionStop->setEnabled(ok && sh->runStatus());
+		ui.actionCopy_link->setEnabled(ok);
 	}
 }
 
@@ -368,10 +395,8 @@ void neteK::Gui::globalSettings()
 void neteK::Gui::copyLinkMenu()
 {
 	QPointer<Share> sh = currentShare();
-	if(sh) {
-		CopyLinkMenu menu(sh->URLProtocol(), sh->port());
-		menu.exec(QCursor::pos());
-	}
+	if(sh && sh->status() != Share::StatusUnconfigured)
+		CopyLinkMenu(sh->URLProtocol(), sh->port()).exec(QCursor::pos());
 }
 
 #include "netek_gui.moc"

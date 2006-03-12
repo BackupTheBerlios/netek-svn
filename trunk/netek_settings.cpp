@@ -30,6 +30,22 @@ void neteK::Settings::setGuiGeometry(QRect rect)
 QRect neteK::Settings::guiGeometry()
 { return value("gui/geometry").toRect(); }
 
+QList<int> neteK::Settings::guiShareListColumns()
+{
+	QList<int> slc;
+	foreach(QVariant c, value("gui/shareListColumns").toList())
+		slc.append(c.toInt());
+	return slc;
+}
+
+void neteK::Settings::setGuiShareListColumns(QList<int> slc_)
+{
+	QList<QVariant> slc;
+	foreach(int c, slc_)
+		slc.append(QVariant(c));
+	setValue("gui/shareListColumns", slc);
+}
+
 bool neteK::Settings::ftpAllowPassive()
 { return value("ftp/allowPassive", true).toBool(); }
 

@@ -28,7 +28,6 @@ private:
 	
 	QPointer<Shares> m_shares;
 	Share *currentShare();
-	void saveGeometryTimer();
 	
 signals:
 	void quit();
@@ -44,8 +43,9 @@ public slots:
 	void toggleVisible();
 	void trayMenu(const QPoint &pos);
 	void saveGeometry();
+	void saveGeometryTimer();
+	void shareMenu();
 	void copyLinkMenu();
-	void shareMenu(const QPoint &pos);
 };
 
 }
