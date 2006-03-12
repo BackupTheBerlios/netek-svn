@@ -317,13 +317,13 @@ void neteK::Gui::sharesChanged()
 				item->setTextAlignment(3, Qt::AlignCenter);
 				item->setTextAlignment(4, Qt::AlignCenter);
 				
-				/*{
+				{
 					QFont font = item->font(0);
-					font.setPointSize(font.pointSize()+1);
+					//font.setPointSize(font.pointSize()+1);
 					font.setBold(true);
 					for(int j=0; j<ui.shareList->columnCount(); ++j)
 						item->setFont(j, font);
-				}*/
+				}
 				
 				ui.shareList->addTopLevelItem(item);
 			}
