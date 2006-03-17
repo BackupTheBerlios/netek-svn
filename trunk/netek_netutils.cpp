@@ -3,12 +3,16 @@
 
 // TODO 1.0: provide settings for autodetect timeouts...?
 // TODO 1.0: more tests for autodetection
-// TODO 1.0: win32 port of networkInterfaces
 
 #ifdef Q_OS_UNIX
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <ifaddrs.h>
+#endif
+
+#ifdef Q_OS_WIN32
+#include <windows.h>
+#include <ws2tcpip.h>
 #endif
 
 namespace neteK {
@@ -204,9 +208,13 @@ bool neteK::isPublicNetwork(QHostAddress addr)
 
 bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
 {
+	bool ret = false;
+
 #ifdef Q_OS_UNIX
 	ifaddrs *ifa;
 	if(0 == getifaddrs(&ifa)) {
+		ret = true;
+
 		for(ifaddrs *nif = ifa; nif != 0; nif = nif->ifa_next) {
 			if(nif->ifa_name && nif->ifa_addr) {
 				QHostAddress addr;
@@ -218,11 +226,36 @@ bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
 		}
 
 		freeifaddrs(ifa);
-		return true;
 	}
 #endif
 
-	return false;
+#ifdef Q_OS_WIN32
+	int afs[] = {AF_INET, AF_INET6};
+	for(int af = 0; af < 2; ++af) {
+		SOCKET sock = ::socket(afs[af], SOCK_STREAM, 0);
+		if(sock != INVALID_SOCKET) {
+			INTERFACE_INFO info[512];
+			DWORD bufsize;
+			if(SOCKET_ERROR != ::WSAIoctl(sock, SIO_GET_INTERFACE_LIST, 0, 0, &info, sizeof(info), &bufsize, 0, 0)) {
+				ret = true;
+				int num = bufsize/sizeof(INTERFACE_INFO);
+				for(int i=0; i<num; ++i) {
+					INTERFACE_INFO *ifa = info + i;
+
+					QHostAddress addr;
+					addr.setAddress(&(ifa->iiAddress.Address));
+
+					if(!addr.isNull())
+						nifs.append(qMakePair(QString("if%1").arg(i), addr));
+				}
+			}
+
+			::closesocket(sock);
+		}
+	}
+#endif
+
+	return ret;
 }
 
 #include "netek_netutils.moc"
