@@ -6,9 +6,9 @@
 // TODO 1.0: win32 port of networkInterfaces
 
 #ifdef Q_OS_UNIX
-#include <sys/types.h> 
-#include <sys/socket.h> 
-#include <ifaddrs.h> 
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <ifaddrs.h>
 #endif
 
 namespace neteK {
@@ -20,33 +20,41 @@ struct AutoDetectCache {
 
 class PublicAddressDetector: public QObject {
 	Q_OBJECT;
-	
+
 	bool m_detected;
 	QHostAddress m_default;
-	
+
+	bool m_auto;
 	QPointer<QBuffer> m_auto_buf;
 	QPointer<QHttp> m_auto_http;
 	int m_auto_get;
-	
+
 	static AutoDetectCache *m_auto_cache;
-	
+	static QObject *m_auto_detector;
+
 	void emitDetected(QHostAddress addr)
 	{
 		if(!m_detected) {
 			qDebug() << "Public address:" << addr.toString();
-			
+
 			m_detected = true;
+
+			if(m_auto) {
+				Q_ASSERT(m_auto_detector == this);
+				m_auto_detector = 0;
+			}
+
 			emit detected(addr);
 			deleteLater();
 		}
 	}
-	
+
 private slots:
 	void emitDefault()
 	{
 		emitDetected(m_default);
 	}
-	
+
 	void hostInfo(QHostInfo info)
 	{
 		QList<QHostAddress> addrs = info.addresses();
@@ -57,13 +65,13 @@ private slots:
 			emitDefault();
 		}
 	}
-	
+
 	void autoFinished(int id, bool error)
 	{
 		if(id == m_auto_get) {
 			delete m_auto_cache;
 			m_auto_cache = new AutoDetectCache;
-				
+
 			if(!error && m_auto_http->lastResponse().isValid() && m_auto_http->lastResponse().statusCode() / 100 == 2) {
 				m_auto_buf->reset();
 				if(m_auto_buf->canReadLine()) {
@@ -76,22 +84,53 @@ private slots:
 					}
 				}
 			}
-			
-			qWarning() << "Autodetect failed, using default address for 30 seconds";
-			m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(30);
+
+			qWarning() << "Autodetect failed, using default address for 15 seconds";
+			m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
 			emitDefault();
 		}
 	}
-		
+
+	void checkAuto()
+	{
+		if(m_auto_detector) {
+			qWarning() << "Scheduling autodetection into queue";
+			connect(m_auto_detector, SIGNAL(destroyed()), SLOT(checkAuto()), Qt::QueuedConnection);
+			return;
+		}
+
+		m_auto_detector = this;
+
+		if(m_auto_cache && m_auto_cache->timeout < QDateTime::currentDateTime()) {
+			delete m_auto_cache;
+			m_auto_cache = 0;
+		}
+
+		if(m_auto_cache) {
+			if(m_auto_cache->address.isNull())
+				emitDefault();
+			else
+				emitDetected(m_auto_cache->address);
+		} else {
+			qDebug() << "Performing autodetect";
+			m_auto_buf = new QBuffer(this);
+			m_auto_buf->open(QIODevice::ReadWrite);
+			m_auto_http = new QHttp(this);
+			connect(m_auto_http, SIGNAL(requestFinished(int, bool)), SLOT(autoFinished(int, bool)));
+			m_auto_http->setHost("netek.berlios.de");
+			m_auto_get = m_auto_http->get("/cgi-bin/myip", m_auto_buf);
+		}
+	}
+
 public:
 	PublicAddressDetector(QHostAddress addr)
-	: m_detected(false), m_default(addr)
+	: m_detected(false), m_default(addr), m_auto(false)
 	{ }
-	
+
 	void start()
 	{
-		QTimer::singleShot(20000, this, SLOT(emitDefault()));
-		
+		QTimer::singleShot(15000, this, SLOT(emitDefault()));
+
 		Settings settings;
 		if(settings.publicAddress() == Settings::PublicAddressManual) {
 			QString custom = settings.customPublicAddress();
@@ -103,25 +142,8 @@ public:
 				QHostInfo::lookupHost(custom, this, SLOT(hostInfo(QHostInfo)));
 			}
 		} else {
-			if(m_auto_cache && m_auto_cache->timeout < QDateTime::currentDateTime()) {
-				delete m_auto_cache;
-				m_auto_cache = 0;
-			}
-			
-			if(m_auto_cache) {
-				if(m_auto_cache->address.isNull())
-					emitDefault();
-				else
-					emitDetected(m_auto_cache->address);
-			} else {
-				qDebug() << "Performing autodetect";
-				m_auto_buf = new QBuffer(this);
-				m_auto_buf->open(QIODevice::ReadWrite);
-				m_auto_http = new QHttp(this);
-				connect(m_auto_http, SIGNAL(requestFinished(int, bool)), SLOT(autoFinished(int, bool)));
-				m_auto_http->setHost("netek.berlios.de");
-				m_auto_get = m_auto_http->get("/cgi-bin/myip", m_auto_buf);
-			}
+			m_auto = true;
+			checkAuto();
 		}
 	}
 
@@ -132,6 +154,7 @@ signals:
 }
 
 neteK::AutoDetectCache *neteK::PublicAddressDetector::m_auto_cache = 0;
+QObject *neteK::PublicAddressDetector::m_auto_detector = 0;
 
 void neteK::resolvePublicAddress(QHostAddress def, QObject *rec, const char *slot)
 {
@@ -145,7 +168,7 @@ bool neteK::isLoopback(QHostAddress addr)
 	if(addr.protocol() == QAbstractSocket::IPv4Protocol) {
 		return (addr.toIPv4Address() & 0xff000000) == 0x7f000000;
 	}
-	
+
 	return false;
 }
 
@@ -154,7 +177,7 @@ bool neteK::isOtherNonPublic(QHostAddress addr)
 	if(addr.protocol() == QAbstractSocket::IPv4Protocol) {
 		return (addr.toIPv4Address() & 0xffff0000) == 0xa9fe0000;
 	}
-	
+
 	return false;
 }
 
@@ -167,7 +190,7 @@ bool neteK::isPrivateNetwork(QHostAddress addr)
 			((a & 0xfff00000) == 0xac100000) ||
 			((a & 0xffff0000) == 0xc0a80000);
 	}
-	
+
 	return false;
 }
 
@@ -188,12 +211,12 @@ bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
 			if(nif->ifa_name && nif->ifa_addr) {
 				QHostAddress addr;
 				addr.setAddress(nif->ifa_addr);
-				
+
 				if(!addr.isNull())
 					nifs.append(qMakePair(QString(nif->ifa_name), addr));
 			}
 		}
-		
+
 		freeifaddrs(ifa);
 		return true;
 	}
