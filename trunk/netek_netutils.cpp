@@ -82,7 +82,7 @@ private slots:
 					QHostAddress addr;
 					if(addr.setAddress(QString::fromUtf8(m_auto_buf->readLine(1000)))) {
 						m_auto_cache->address = addr;
-						m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(900);
+						m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(300);
 						emitDetected(addr);
 						return;
 					}
@@ -256,6 +256,18 @@ bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
 #endif
 
 	return ret;
+}
+
+quint16 neteK::randomPort()
+{
+	// maybe we should use something more serious here?
+	quint16 rnd = rand();
+	rnd *= rand();
+	rnd += rand();
+
+	Settings settings;
+	quint16 min(settings.randomTcpPortMin()), max(settings.randomTcpPortMax());
+	return min + rnd % (max-min+1);
 }
 
 #include "netek_netutils.moc"

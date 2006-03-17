@@ -5,9 +5,6 @@
 #include <windows.h>
 #endif
 
-// TODO 1.0: cleanup rand
-// TODO 1.0: cleanup ipv4/6
-
 int main(int argc, char *argv[])
 {
 	srand(

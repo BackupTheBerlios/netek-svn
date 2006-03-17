@@ -1,6 +1,7 @@
 #include "netek_settings.h"
 #include "netek_share.h"
 #include "netek_sharesettings.h"
+#include "netek_netutils.h"
 
 neteK::ShareSettings::ShareSettings(Share *share)
 : m_share(share)
@@ -24,14 +25,14 @@ neteK::ShareSettings::ShareSettings(Share *share)
 	ui.authentication->setChecked(m_share->access() == Share::AccessUsernamePassword);
 	connect(ui.anonymous, SIGNAL(clicked()), SLOT(securityRadio()));
 	connect(ui.authentication, SIGNAL(clicked()), SLOT(securityRadio()));
-	
+
 	{
 		QString u, p;
 		m_share->usernamePassword(u,p);
 		ui.username->setText(u);
 		ui.password->setText(p);
 	}
-	
+
 	securityRadio();
 }
 
@@ -49,16 +50,13 @@ void neteK::ShareSettings::folderBrowse()
 {
 	QString name = QFileDialog::getExistingDirectory(this, tr("Select share folder"), ui.folder->text());
 	if(name.size())
-		ui.folder->setText(name); // TODO 1.0: set native name (win32!)
+		ui.folder->setText(name);
 }
 
 void neteK::ShareSettings::pickRandom()
 {
-	Settings settings;
-	quint16 min(settings.randomTcpPortMin()), max(settings.randomTcpPortMax());
-
 	for(int i=0; i<100; ++i) {
-		quint16 port = min + rand() % (max-min+1);
+		quint16 port = randomPort();
 
 		if(m_test_server)
 			delete m_test_server;

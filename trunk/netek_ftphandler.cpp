@@ -1,6 +1,7 @@
 #include "netek_share.h"
 #include "netek_settings.h"
 #include "netek_ftphandler.h"
+#include "netek_netutils.h"
 
 // TODO 1.0: no space left on disk test
 // TODO 1.1: fix socket speed - unbuffered sockets?
@@ -164,11 +165,8 @@ void neteK::FtpHandlerPORT::status()
 neteK::FtpHandlerPASV::FtpHandlerPASV(QHostAddress address, quint16 &port)
 : m_address(address)
 {
-	Settings settings;
-	quint16 min(settings.randomTcpPortMin()), max(settings.randomTcpPortMax());
-
 	for(int i=0; i<100; ++i) {
-		port = min + rand() % (max-min+1);
+		port = randomPort();
 
 		if(m_server)
 			delete m_server;
