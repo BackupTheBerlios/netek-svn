@@ -12,12 +12,12 @@ namespace neteK {
 
 class CopyLinkMenu: public QMenu {
 	Q_OBJECT;
-	
+
 	QString m_protocol;
 	quint16 m_port;
 	QPointer<QAction> m_public;
 	QIcon m_icon;
-	
+
 	QString link(QString addr)
 	{
 		return QString("%1://%2:%3")
@@ -25,90 +25,90 @@ class CopyLinkMenu: public QMenu {
 			.arg(addr)
 			.arg(m_port);
 	}
-	
+
 	QString link(QHostAddress addr)
 	{
 		return link(addr.toString());
 	}
-	
+
 	void setPublic(QString text)
 	{
 		if(m_public) {
 			m_public->setIcon(m_icon);
 			m_public->setText(text);
-			
+
 			QFont font = m_public->font();
 			font.setItalic(false);
 			m_public->setFont(font);
-			
+
 			m_public = 0;
-			
+
 			adjustSize();
 		}
 	}
-	
+
 public slots:
 	void resolved(QHostAddress addr)
 	{
 		if(!m_public)
 			return;
-			
+
 		if(addr.isNull()) {
 			m_public->setText(tr("Autodetect failed"));
 			adjustSize();
 		} else
 			setPublic(link(addr));
 	}
-	
+
 	void copy(QAction *a)
 	{
 		if(a != m_public)
 			qApp->clipboard()->setText(a->text());
 	}
-	
+
 public:
 	CopyLinkMenu(QString prot, quint16 port)
 	: m_protocol(prot), m_port(port), m_icon(QPixmap(":/icons/www.png"))
 	{
 		connect(this, SIGNAL(triggered(QAction*)), SLOT(copy(QAction*)));
-		
+
 		setTitle(tr("Copy link"));
 		setIcon(m_icon);
-		
+
 		m_public = addAction(tr("Autodetecting public address..."));
 		{
 			QFont font = m_public->font();
 			font.setItalic(true);
 			m_public->setFont(font);
 		}
-		
+
 		QList<QPair<QString, QHostAddress> > nifs;
 		if(networkInterfaces(nifs)) {
 			QMap<int, QList<QHostAddress> > sorted;
 			QList<QPair<QString, QHostAddress> >::iterator nif;
 			for(nif = nifs.begin(); nif != nifs.end(); ++nif) {
 				int idx = 3;
-				
+
 				if(nif->second.protocol() == QAbstractSocket::IPv4Protocol) {
 					if(isLoopback(nif->second))
 						continue;
-						
+
 					if(isPublicNetwork(nif->second))
 						idx = 0;
 					else if(isPrivateNetwork(nif->second))
 						idx = 1;
 					else
 						idx = 2;
-						
+
 					sorted[idx].append(nif->second);
 				}
 			}
-			
+
 			foreach(QList<QHostAddress> alist, sorted)
 				foreach(QHostAddress addr, alist)
-					addAction(m_icon, link(addr));						
+					addAction(m_icon, link(addr));
 		}
-		
+
 		Settings settings;
 		if(settings.publicAddress() == Settings::PublicAddressManual)
 			setPublic(link(settings.customPublicAddress()));
@@ -133,9 +133,9 @@ neteK::Gui::Gui()
 
 	m_shares = new Shares;
 	m_shares->setParent(this);
-	
+
 	ui.shareList->setContextMenuPolicy(Qt::CustomContextMenu);
-	
+
 	connect(ui.shareList, SIGNAL(customContextMenuRequested(const QPoint &)), SLOT(shareMenu()));
 
 	connect(m_shares, SIGNAL(changed()), SLOT(sharesChanged()));
@@ -157,7 +157,7 @@ neteK::Gui::Gui()
 	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
 
 	sharesChanged();
-	
+
 	{
 		QRect geom = Settings().guiGeometry();
 		if(geom.isValid()) {
@@ -165,16 +165,16 @@ neteK::Gui::Gui()
 			move(geom.topLeft());
 		}
 	}
-	
+
 	{
 		QPointer<QHeaderView> h = ui.shareList->header();
 		h->setStretchLastSection(false);
-				
+
 		QList<int> cwidth = Settings().guiShareListColumns();
 		for(int i=0; i<cwidth.size(); ++i)
 			if(cwidth.at(i) > 0)
 				h->resizeSection(i, cwidth.at(i));
-				
+
 		connect(h, SIGNAL(sectionResized(int,int,int)), SLOT(saveGeometryTimer()));
 	}
 
@@ -210,11 +210,11 @@ void neteK::Gui::saveGeometry()
 	Settings settings;
 	m_save_geometry_timer = false;
 	settings.setGuiGeometry(QRect(pos(), size()));
-	
+
 	QList<int> slc;
 	for(int i=0; i<ui.shareList->columnCount(); ++i)
 		slc.append(ui.shareList->columnWidth(i));
-		
+
 	settings.setGuiShareListColumns(slc);
 }
 
@@ -240,7 +240,7 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 
 	menu.exec(pos);
 }
-	
+
 void neteK::Gui::shareMenu()
 {
 	QPointer<Share> sh = currentShare();
@@ -251,7 +251,7 @@ void neteK::Gui::shareMenu()
 		menu.addAction(ui.actionStart);
 		menu.addAction(ui.actionStop);
 		menu.addAction(ui.actionDelete);
-		
+
 		menu.exec(QCursor::pos());
 	}
 }
@@ -316,7 +316,7 @@ void neteK::Gui::sharesChanged()
 				item->setTextAlignment(2, Qt::AlignCenter);
 				item->setTextAlignment(3, Qt::AlignCenter);
 				item->setTextAlignment(4, Qt::AlignCenter);
-				
+
 				{
 					QFont font = item->font(0);
 					//font.setPointSize(font.pointSize()+1);
@@ -324,58 +324,58 @@ void neteK::Gui::sharesChanged()
 					for(int j=0; j<ui.shareList->columnCount(); ++j)
 						item->setFont(j, font);
 				}
-				
+
 				ui.shareList->addTopLevelItem(item);
 			}
-			
+
 			item->setText(0, /*" " +*/ sh->folder());
 			item->setText(1, QString::number(sh->port()));
-			
+
 			{
 				QString flags;
 				if(sh->readOnly())
 					flags += 'R';
 				if(sh->access() == Share::AccessUsernamePassword)
 					flags += 'U';
-				
+
 				if(flags.size())
 					item->setText(2, flags);
 				else
 					item->setText(2, "-");
 			}
-			
+
 			QPixmap icon;
-			QColor bg;
+			//QColor bg;
 			QString status;
 			switch(sh->status()) {
 				case Share::StatusStarted:
 					status = tr("started");
-					bg = QColor(0xff, 0xff, 0xff);
+					//bg = QColor(0xff, 0xff, 0xff);
 					icon = QPixmap(":/icons/folder_open.png");
 					break;
 				case Share::StatusStopped:
 					status = tr("stopped");
-					bg = QColor(0xcc, 0xcc, 0xcc);
+					//bg = QColor(0xcc, 0xcc, 0xcc);
 					icon = QPixmap(":/icons/folder_grey.png");
 					break;
 				default:
 					status = tr("processing");
-					bg = QColor(0xff, 0x99, 0x99);
+					//bg = QColor(0xff, 0x99, 0x99);
 					icon = QPixmap(":/icons/exec.png");
 			}
-			
+
 			item->setIcon(0, icon);
 			item->setText(3, status);
 			item->setText(4, QString::number(sh->clients()));
-			
-			if(sh->clients())
-				bg = QColor(0xff, 0xff, 0x66);
-				
-			for(int j=0; j<ui.shareList->columnCount(); ++j)
-				item->setBackgroundColor(j, bg);
+
+			//if(sh->clients())
+			//	bg = QColor(0xff, 0xff, 0x66);
+
+			//for(int j=0; j<ui.shareList->columnCount(); ++j)
+			//	item->setBackgroundColor(j, bg);
 		}
 	}
-	
+
 	{
 		QPointer<Share> sh = currentShare();
 		bool ok = sh && sh->status() != Share::StatusUnconfigured;
