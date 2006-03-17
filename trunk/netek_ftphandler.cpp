@@ -10,9 +10,9 @@ neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	m_buffer.resize(100000);
-	
+
 	connect(this, SIGNAL(statusSignal()), SLOT(status()), Qt::QueuedConnection);
 	connect(this, SIGNAL(transferSignal()), SLOT(transferEvent()), Qt::QueuedConnection);
 }
@@ -28,7 +28,7 @@ void neteK::FtpHandlerData::emitStartStatus(bool ok)
 void neteK::FtpHandlerData::emitTransferStatus(bool ok)
 {
 	Q_ASSERT(m_start);
-	
+
 	if(!m_transfer) {
 		m_transfer = true;
 		emit transferStatus(ok);
@@ -38,7 +38,7 @@ void neteK::FtpHandlerData::emitTransferStatus(bool ok)
 bool neteK::FtpHandlerData::sourceSink(QPointer<QIODevice> &source, QPointer<QIODevice> &sink)
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	if(!m_socket || !m_dev)
 		return false;
 
@@ -56,7 +56,7 @@ bool neteK::FtpHandlerData::sourceSink(QPointer<QIODevice> &source, QPointer<QIO
 bool neteK::FtpHandlerData::connectSourceSink()
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	QPointer<QIODevice> source, sink;
 	return sourceSink(source, sink)
 		&& connect(source, SIGNAL(readyRead()), SIGNAL(transferSignal()))
@@ -66,7 +66,7 @@ bool neteK::FtpHandlerData::connectSourceSink()
 void neteK::FtpHandlerData::transferEvent()
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	QPointer<QIODevice> source, sink;
 	if(sourceSink(source, sink)) {
 		if(sink->bytesToWrite())
@@ -121,9 +121,9 @@ neteK::FtpHandlerPORT::FtpHandlerPORT(QHostAddress address, quint16 port)
 void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	m_send = send;
-	
+
 	Q_ASSERT(!m_dev);
 	m_dev = dev;
 	m_dev->setParent(this);
@@ -139,12 +139,12 @@ void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 void neteK::FtpHandlerPORT::status()
 {
 	//qDebug() << __FUNCTION__;
-	
+
 	if(!m_socket)
 		return;
-		
+
 	//qDebug() << __FUNCTION__ << m_socket->state();
-	
+
 	if(!m_connected) {
 		if(m_socket->state() == QAbstractSocket::ConnectedState) {
 			m_connected = true;
@@ -237,7 +237,7 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 : m_share(s), m_control(control), m_control_channel_blocked(false)
 {
 	Settings settings;
-	
+
 	m_control->setParent(this);
 
 #define ADD_COMMAND(_cmd, _flags) addCommand(&FtpHandler::command_ ## _cmd, #_cmd, (_flags))
@@ -293,7 +293,7 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 void neteK::FtpHandler::init()
 {
 	Settings settings;
-	
+
 	m_loggedin = false;
 	m_username.clear();
 	m_cwd = m_share->initialFolder();
@@ -304,19 +304,19 @@ void neteK::FtpHandler::init()
 	closeDataChannel();
 
 	sendLine(220, QCoreApplication::applicationName());
-	
+
 	emit processSignal();
 }
 
 void neteK::FtpHandler::start(QHostAddress publ)
 {
 	m_public = publ;
-	
+
 	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
 	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
 	connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
 	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
-	
+
 	init();
 }
 
@@ -326,14 +326,14 @@ bool neteK::FtpHandler::list(QString path, QFileInfoList &lst, bool *dir)
 	if(m_share->fileInformation(m_cwd, path, info)) {
 		if(dir)
 			*dir = info.isDir();
-			
+
 		if(info.isDir())
 			return m_share->listFolder(m_cwd, path, lst);
-		
+
 		lst.append(info);
 		return true;
 	}
-	
+
 	return false;
 }
 
@@ -576,9 +576,9 @@ void neteK::FtpHandler::command_NLST(QString args)
 			isdir && args.size()
 				? args + "/" + i.fileName() // emulating vsftpd here
 				: i.fileName()));
-				
+
 	qDebug() << ">>> [" << buf->data().data() << "]";
-	
+
 	buf->reset();
 	startDataChannel(buf, true);
 }
@@ -640,7 +640,7 @@ void neteK::FtpHandler::command_LIST(QString args)
 		QString owner = i.owner();
 		QString group = i.group();
 		QDateTime modified = i.lastModified();
-		
+
 		buf->write(makeLine(QString("%1%2%3%4%5%6%7%8%9%10 %11 %12 %13 %14 %15 %16 %17 %18")
 			.arg(i.isDir() ? 'd' : '-')
 			.arg(p & QFile::ReadOwner ? 'r' : '-')
@@ -695,10 +695,9 @@ void neteK::FtpHandler::command_EPSV(QString args)
 	if(args.toUpper() == "ALL") {
 		sendLine(200, "Command okay.");
 		return;
-	} else if(args.size() == 0 || args == "1" || args == "2") {
-		// TODO 1.1: is 2 (IPv6) really ok? do we need to bind ipv6 addr. as well?
+	} else if(args.size() == 0 || args == "1" /*|| args == "2"*/) {
 	} else {
-		sendLine(522, "Network protocol not supported, use (1,2)");
+		sendLine(522, "Network protocol not supported, use (1)");
 		return;
 	}
 
@@ -719,7 +718,7 @@ void neteK::FtpHandler::command_PASV(QString)
 {
 	if(!m_control)
 		return;
-		
+
 	quint16 port;
 	QPointer<FtpHandlerPASV> handler(new FtpHandlerPASV(m_control->peerAddress(), port));
 	if(port == 0) {
@@ -788,7 +787,7 @@ void neteK::FtpHandler::command_STOU(QString)
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
-	
+
 	QString tmp;
 	QPointer<QFile> file = m_share->writeFileUnique(m_cwd, tmp);
 	if(file) {
@@ -806,7 +805,7 @@ void neteK::FtpHandler::command_STOR(QString args)
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
-	
+
 	QPointer<QFile> file = m_share->writeFile(m_cwd, args);
 	if(file)
 		startDataChannel(file, false);
@@ -821,7 +820,7 @@ void neteK::FtpHandler::command_APPE(QString args)
 		sendLine(450, "Requested file action not taken.");
 		return;
 	}
-	
+
 	QPointer<QFile> file = m_share->writeFile(m_cwd, args, true);
 	if(file)
 		startDataChannel(file, false);
@@ -867,7 +866,7 @@ QByteArray neteK::FtpHandler::makeLine(QString line)
 				out.append(c);
 	}
 	out.append("\r\n");
-	
+
 	return out;
 }
 
