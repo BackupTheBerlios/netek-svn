@@ -8,7 +8,7 @@ Source: netek-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
-neteK is a user-friendly personal FTP and webdav server. The program stays in the system tray without using too much system resources. Target platforms are Linux, Windows, and Mac OS.
+neteK is a user-friendly personal FTP and WebDAV server. The program stays in the system tray without using too many system resources. Target platforms are Linux, Windows, and Mac OS.
 
 %prep
 %setup -q
