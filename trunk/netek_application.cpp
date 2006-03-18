@@ -1,20 +1,14 @@
 #include "netek_application.h"
 
 #ifdef Q_OS_UNIX
-static QStringList autostarts()
-{
-	QStringList list;
-	list.append(QDir::home().filePath(".kde/Autostart/netek"));
-	// TODO 1.0: add gnome autostart
-
-	return list;
-}
+static const char kde_autostart[] = ".kde/Autostart/netek";
+static const char gnome_autostart[] = ".config/autostart/netek.desktop";
 #endif
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
-static const wchar_t *regkey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-static const wchar_t *subkey = L"netek";
+static const wchar_t regkey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+static const wchar_t subkey[] = L"netek";
 #endif
 
 neteK::Application::Application(int &argc, char **argv)
@@ -28,9 +22,18 @@ neteK::Application::Application(int &argc, char **argv)
 #ifdef Q_OS_UNIX
 	setStyle(new QPlastiqueStyle);
 
-	foreach(QString path, autostarts()) {
+	{
+		QString path = QDir::home().filePath(kde_autostart);
 		QFile(path).remove();
 		QFile(applicationFilePath()).link(path);
+	}
+
+	{
+		QFile dfile(QDir::home().filePath(gnome_autostart));
+		if(dfile.open(QIODevice::WriteOnly))
+			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1\n")
+					.arg(applicationFilePath()).toUtf8());
+
 	}
 #endif
 
@@ -47,8 +50,8 @@ neteK::Application::Application(int &argc, char **argv)
 void neteK::Application::userQuit()
 {
 #ifdef Q_OS_UNIX
-	foreach(QString path, autostarts())
-		QFile(path).remove();
+	QFile(QDir::home().filePath(kde_autostart)).remove();
+	QFile(QDir::home().filePath(gnome_autostart)).remove();
 #endif
 
 #ifdef Q_OS_WIN32

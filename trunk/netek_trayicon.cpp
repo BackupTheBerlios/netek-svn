@@ -56,7 +56,7 @@ class TrayIconX11: public QWidget {
 	QPointer<QMainWindow> m_owner;
 	QPixmap m_icon;
 	bool m_docked;
-	Atom m_xembed;
+	//Atom m_xembed;
 
 signals:
 	void activated();
@@ -68,12 +68,12 @@ public:
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setWindowTitle(qApp->applicationName());
-		setMinimumSize(22,22); // a hack for GNOME...
+		setMinimumSize(24,24); // a hack for GNOME...
 
-		{
+		/*{
 			TrapErrorsX11 err;
 			m_xembed = XInternAtom(x11Info().display(), "_XEMBED", True);
-		}
+		}*/
 
 		recheck();
 	}
@@ -108,11 +108,17 @@ public:
 
 	bool x11Event(XEvent *e)
 	{
-		if(e->type == ClientMessage && e->xclient.message_type == m_xembed) {
+		// does not always work under GNOME..?
+		/*if(e->type == ClientMessage && e->xclient.message_type == m_xembed) {
 			if(e->xclient.data.l[1] == XEMBED_EMBEDDED_NOTIFY) {
 				m_docked = true;
 				show();
 			}
+		}*/
+
+		if(e->type == ReparentNotify) {
+			m_docked = true;
+			show();
 		}
 
 		return QWidget::x11Event(e);
