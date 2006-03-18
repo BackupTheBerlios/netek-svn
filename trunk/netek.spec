@@ -1,4 +1,4 @@
-Summary: system tray application for creating FTP and webdav shares
+Summary: system tray FTP and webdav server
 Name: netek
 Version: 0.8.1
 Release: 1
@@ -8,7 +8,7 @@ Source: netek-%{version}.tar.bz2
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 %description
-neteK is an user-friendly application for creating network shares (drives) with FTP and webdav. The program stays in the system tray without using too much system resources. Target platforms are Linux, Windows, and Mac OS.
+neteK is an user-friendly personal FTP and webdav server. The program stays in the system tray without using too much system resources. Target platforms are Linux, Windows, and Mac OS.
 
 %prep
 %setup -q
