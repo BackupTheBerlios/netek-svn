@@ -1,8 +1,7 @@
 Name "neteK 0.8.0"
 Outfile "netek-0.8.0.exe"
+XPStyle on
 InstallDir "$PROGRAMFILES\netek"
-Icon icons\netek.ico
-Uninstallicon icons\netek.ico
 
 Function uninstall
 	ReadRegStr $0 HKLM "Software\neteK" "uninstaller"
@@ -19,21 +18,21 @@ UninstPage uninstConfirm
 UninstPage instfiles
 
 Section Install
+	SetShellVarContext all
 	SetOutPath "$INSTDIR"
 	File release\netek.exe
-	File icons\netek.ico
 	File c:\qt\4.1.0\bin\mingwm10.dll
 	WriteUninstaller "$INSTDIR\uninstaller.exe"
 	WriteRegStr HKLM "Software\neteK" "uninstaller" "$INSTDIR\uninstaller.exe"
 
 	CreateDirectory "$SMPROGRAMS\neteK"
-	CreateShortCut "$SMPROGRAMS\neteK\neteK.lnk" "$INSTDIR\netek.exe" "" "$INSTDIR\netek.ico"
+	CreateShortCut "$SMPROGRAMS\neteK\neteK.lnk" "$INSTDIR\netek.exe"
 	CreateShortCut "$SMPROGRAMS\neteK\Uninstall neteK.lnk" "$INSTDIR\uninstaller.exe"
 SectionEnd
 
 Section Uninstall
+	SetShellVarContext all
 	Delete "$INSTDIR\netek.exe"
-	Delete "$INSTDIR\netek.ico"
 	Delete "$INSTDIR\mingwm10.dll"
 	Delete "$SMPROGRAMS\neteK\Uninstall neteK.lnk"
 	Delete "$SMPROGRAMS\neteK\neteK.lnk"

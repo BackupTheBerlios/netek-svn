@@ -1,7 +1,6 @@
 #include "netek_trayicon.h"
 
 // TODO 1.1: transparent X11 icon
-// TODO 1.1: include .ico as resource under windows
 // TODO 1.1: blinking indicator
 
 #ifdef Q_OS_UNIX
@@ -198,7 +197,7 @@ class TrayIconWin32: public QWidget {
     {
         setAttribute(Qt::WA_DeleteOnClose);
 
-        ok = (m_hIcon = LoadImage(0, L"netek.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE))
+        ok = (m_hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(0)))
             && (m_notify = notify(NIM_ADD));
 
         //QTimer::singleShot(1000, this, SLOT(close()));
