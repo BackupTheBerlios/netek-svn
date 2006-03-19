@@ -13,14 +13,21 @@ class FtpHandlerData: public QObject {
 	bool m_start, m_transfer;
 	qint64 m_to_be_written, m_write_size;
 	QByteArray m_buffer;
+	bool m_transfer_error;
+	bool m_stop_transfer;
+	
+private slots:
+	void setTransferErrorIfRealError(QAbstractSocket::SocketError err);
 
 protected:
 	QPointer<QAbstractSocket> m_socket;
 	QPointer<QIODevice> m_dev;
 	bool m_send;
-
+	
+	bool transferError();
 	bool sourceSink(QPointer<QIODevice> &source, QPointer<QIODevice> &sink);
 	bool connectSourceSink();
+	bool connectSocket();
 	
 	void emitStartStatus(bool ok);
 	void emitTransferStatus(bool ok);

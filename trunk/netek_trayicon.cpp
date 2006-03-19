@@ -1,7 +1,7 @@
 #include "netek_trayicon.h"
 
-// TODO 1.1: transparent X11 icon
-// TODO 1.1: blinking indicator
+// TODO: transparent X11 icon
+// TODO: blinking indicator
 
 #ifdef Q_OS_UNIX
 #include <QX11Info>

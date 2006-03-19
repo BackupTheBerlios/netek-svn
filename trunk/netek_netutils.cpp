@@ -1,8 +1,8 @@
 #include "netek_netutils.h"
 #include "netek_settings.h"
 
-// TODO 1.0: provide settings for autodetect timeouts...?
-// TODO 1.0: more tests for autodetection
+// TODO: provide settings for autodetect timeouts...?
+// TODO: more tests for autodetection
 
 #ifdef Q_OS_UNIX
 #include <sys/types.h>

@@ -348,6 +348,8 @@ bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) con
 
 bool neteK::Share::filesystemPath(QString cwd, QString path, QString &fspath, bool notroot) const
 {
+	// TODO: this needs to be checked for security a bit more
+	
 	QString root = QDir(m_folder).canonicalPath();
 	if(root.size() == 0)
 		return false;

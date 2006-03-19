@@ -5,6 +5,8 @@
 #include <windows.h>
 #endif
 
+// TODO: add logging of events
+
 int main(int argc, char *argv[])
 {
 	srand(

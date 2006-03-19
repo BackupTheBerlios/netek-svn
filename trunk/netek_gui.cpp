@@ -6,8 +6,6 @@
 #include "netek_settings.h"
 #include "netek_netutils.h"
 
-// TODO 1.1: add logging of events
-
 namespace neteK {
 
 class CopyLinkMenu: public QMenu {

@@ -3,12 +3,12 @@
 #include "netek_ftphandler.h"
 #include "netek_netutils.h"
 
-// TODO 1.0: no space left on disk test
-// TODO 1.1: fix socket speed - unbuffered sockets?
-// TODO 1.0: site chmod
+// TODO: no space left on disk test
+// TODO: fix socket speed - unbuffered sockets?
+// TODO: site chmod
 
 neteK::FtpHandlerData::FtpHandlerData()
-: m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_send(false)
+: m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_transfer_error(false), m_stop_transfer(false), m_send(false)
 {
 	//qDebug() << __FUNCTION__;
 
@@ -16,6 +16,15 @@ neteK::FtpHandlerData::FtpHandlerData()
 
 	connect(this, SIGNAL(statusSignal()), SLOT(status()), Qt::QueuedConnection);
 	connect(this, SIGNAL(transferSignal()), SLOT(transferEvent()), Qt::QueuedConnection);
+}
+
+bool neteK::FtpHandlerData::transferError()
+{ return m_transfer_error; }
+
+void neteK::FtpHandlerData::setTransferErrorIfRealError(QAbstractSocket::SocketError err)
+{
+	if(err != QAbstractSocket::RemoteHostClosedError)
+		m_transfer_error = true;
 }
 
 void neteK::FtpHandlerData::emitStartStatus(bool ok)
@@ -64,24 +73,37 @@ bool neteK::FtpHandlerData::connectSourceSink()
 		&& connect(sink, SIGNAL(bytesWritten(qint64)), SIGNAL(transferSignal()));
 }
 
+bool neteK::FtpHandlerData::connectSocket()
+{
+	return m_socket
+		&& connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(setTransferErrorIfRealError(QAbstractSocket::SocketError)))
+		&& connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()))
+		&& connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
+}
+
 void neteK::FtpHandlerData::transferEvent()
 {
 	//qDebug() << __FUNCTION__;
+	
+	if(m_stop_transfer)
+		return;
 
 	QPointer<QIODevice> source, sink;
 	if(sourceSink(source, sink)) {
 		if(sink->bytesToWrite())
 			return;
 
-		bool close = false;
 		for(;;) {
 			Q_ASSERT(m_to_be_written >= 0);
 
 			while(m_to_be_written > 0) {
 				qint64 written = sink->write(m_buffer.data() + (m_write_size - m_to_be_written), m_to_be_written);
 				if(written <= 0) {
-					if(written < 0)
-						close = true;
+					if(written < 0) {
+						qDebug() << "Error writing";
+						m_transfer_error = true;
+						m_stop_transfer = true;
+					}
 					break;
 				}
 
@@ -92,11 +114,20 @@ void neteK::FtpHandlerData::transferEvent()
 
 			if(m_to_be_written > 0)
 				break;
-
+				
+			if(!source->isSequential() && source->atEnd()) {
+				m_stop_transfer = true;
+				break;
+			}
+				
 			qint64 read = source->read(m_buffer.data(), m_buffer.size());
 			if(read <= 0) {
-				if(read < 0 || !source->isSequential() && source->atEnd())
-					close = true;
+				if(read < 0) {
+					qDebug() << "Error reading";
+					m_transfer_error = true;
+					m_stop_transfer = true;
+				}
+				
 				break;
 			} else {
 				//qDebug() << "Read" << read;
@@ -105,7 +136,7 @@ void neteK::FtpHandlerData::transferEvent()
 			}
 		}
 
-		if(close) {
+		if(m_stop_transfer) {
 			source->close();
 			sink->close();
 		}
@@ -132,8 +163,7 @@ void neteK::FtpHandlerPORT::start(QIODevice *dev, bool send)
 	Q_ASSERT(!m_socket);
 
 	m_socket = new QTcpSocket(this);
-	connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()));
-	connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
+	connectSocket();
 	m_socket->connectToHost(m_address, m_port);
 }
 
@@ -157,7 +187,7 @@ void neteK::FtpHandlerPORT::status()
 		}
 	} else {
 		if(m_socket->state() == QAbstractSocket::UnconnectedState) {
-			emitTransferStatus(true);
+			emitTransferStatus(!transferError());
 		}
 	}
 }
@@ -201,15 +231,13 @@ void neteK::FtpHandlerPASV::handleNewClient()
 				return;
 
 			if(!(m_address == m_socket->peerAddress())) {
-				// TODO 1.1: log warning, very likely crack attempt
+				// TODO: log warning, very likely crack attempt
 				delete m_socket;
 				return;
 			}
 
 			m_socket->setParent(this);
-			connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()));
-			connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
-
+			connectSocket();
 			connectSourceSink();
 			emitStartStatus(true);
 		}
@@ -227,7 +255,7 @@ void neteK::FtpHandlerPASV::status()
 		return;
 
 	if(m_socket->state() == QAbstractSocket::UnconnectedState)
-		emitTransferStatus(true);
+		emitTransferStatus(!transferError());
 }
 
 
