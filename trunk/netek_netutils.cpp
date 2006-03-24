@@ -33,8 +33,8 @@ class PublicAddressDetector: public QObject {
 	QPointer<QHttp> m_auto_http;
 	int m_auto_get;
 
-	static AutoDetectCache *m_auto_cache;
-	static QObject *m_auto_detector;
+	static AutoDetectCache *g_auto_cache;
+	static QObject *g_auto_detector;
 
 	void emitDetected(QHostAddress addr)
 	{
@@ -44,8 +44,8 @@ class PublicAddressDetector: public QObject {
 			m_detected = true;
 
 			if(m_auto) {
-				Q_ASSERT(m_auto_detector == this);
-				m_auto_detector = 0;
+				Q_ASSERT(g_auto_detector == this);
+				g_auto_detector = 0;
 			}
 
 			emit detected(addr);
@@ -73,16 +73,16 @@ private slots:
 	void autoFinished(int id, bool error)
 	{
 		if(id == m_auto_get) {
-			delete m_auto_cache;
-			m_auto_cache = new AutoDetectCache;
+			delete g_auto_cache;
+			g_auto_cache = new AutoDetectCache;
 
 			if(!error && m_auto_http->lastResponse().isValid() && m_auto_http->lastResponse().statusCode() / 100 == 2) {
 				m_auto_buf->reset();
 				if(m_auto_buf->canReadLine()) {
 					QHostAddress addr;
 					if(addr.setAddress(QString::fromUtf8(m_auto_buf->readLine(1000)))) {
-						m_auto_cache->address = addr;
-						m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(300);
+						g_auto_cache->address = addr;
+						g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(300);
 						emitDetected(addr);
 						return;
 					}
@@ -90,31 +90,31 @@ private slots:
 			}
 
 			qWarning() << "Autodetect failed, using default address for 15 seconds";
-			m_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
+			g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
 			emitDefault();
 		}
 	}
 
 	void checkAuto()
 	{
-		if(m_auto_detector) {
+		if(g_auto_detector) {
 			qWarning() << "Scheduling autodetection into queue";
-			connect(m_auto_detector, SIGNAL(destroyed()), SLOT(checkAuto()), Qt::QueuedConnection);
+			connect(g_auto_detector, SIGNAL(destroyed()), SLOT(checkAuto()), Qt::QueuedConnection);
 			return;
 		}
 
-		m_auto_detector = this;
+		g_auto_detector = this;
 
-		if(m_auto_cache && m_auto_cache->timeout < QDateTime::currentDateTime()) {
-			delete m_auto_cache;
-			m_auto_cache = 0;
+		if(g_auto_cache && g_auto_cache->timeout < QDateTime::currentDateTime()) {
+			delete g_auto_cache;
+			g_auto_cache = 0;
 		}
 
-		if(m_auto_cache) {
-			if(m_auto_cache->address.isNull())
+		if(g_auto_cache) {
+			if(g_auto_cache->address.isNull())
 				emitDefault();
 			else
-				emitDetected(m_auto_cache->address);
+				emitDetected(g_auto_cache->address);
 		} else {
 			qDebug() << "Performing autodetect";
 			m_auto_buf = new QBuffer(this);
@@ -157,8 +157,8 @@ signals:
 
 }
 
-neteK::AutoDetectCache *neteK::PublicAddressDetector::m_auto_cache = 0;
-QObject *neteK::PublicAddressDetector::m_auto_detector = 0;
+neteK::AutoDetectCache *neteK::PublicAddressDetector::g_auto_cache = 0;
+QObject *neteK::PublicAddressDetector::g_auto_detector = 0;
 
 void neteK::resolvePublicAddress(QHostAddress def, QObject *rec, const char *slot)
 {
