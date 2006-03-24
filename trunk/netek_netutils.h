@@ -6,6 +6,8 @@
 
 namespace neteK {
 
+	const int networkBufferSize = 8192;
+
 	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
 
 	bool isPrivateNetwork(QHostAddress addr);
