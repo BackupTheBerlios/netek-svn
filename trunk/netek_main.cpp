@@ -6,6 +6,7 @@
 #endif
 
 // TODO: add logging of events
+// TODO: fix dist. license
 
 int main(int argc, char *argv[])
 {
