@@ -8,11 +8,9 @@
 // TODO: site chmod
 
 neteK::FtpHandlerData::FtpHandlerData()
-: m_start(false), m_transfer(false), m_to_be_written(0), m_write_size(0), m_transfer_error(false), m_stop_transfer(false), m_send(false)
+: m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
 {
 	//qDebug() << __FUNCTION__;
-
-	m_buffer.resize(100000);
 
 	connect(this, SIGNAL(statusSignal()), SLOT(status()), Qt::QueuedConnection);
 	connect(this, SIGNAL(transferSignal()), SLOT(transferEvent()), Qt::QueuedConnection);
@@ -90,50 +88,32 @@ void neteK::FtpHandlerData::transferEvent()
 
 	QPointer<QIODevice> source, sink;
 	if(sourceSink(source, sink)) {
+		//qDebug() << "Bytes available" << source->bytesAvailable();
+		//qDebug() << "Bytes to write" << sink->bytesToWrite();
 		if(sink->bytesToWrite())
 			return;
-
+			
 		for(;;) {
-			Q_ASSERT(m_to_be_written >= 0);
-
-			while(m_to_be_written > 0) {
-				qint64 written = sink->write(m_buffer.data() + (m_write_size - m_to_be_written), m_to_be_written);
-				if(written <= 0) {
-					if(written < 0) {
-						qDebug() << "Error writing";
-						m_transfer_error = true;
-						m_stop_transfer = true;
-					}
-					break;
-				}
-
-				//qDebug() << "Written" << written;
-				Q_ASSERT(written <= m_to_be_written);
-				m_to_be_written -= written;
-			}
-
-			if(m_to_be_written > 0)
-				break;
-				
-			if(!source->isSequential() && source->atEnd()) {
-				m_stop_transfer = true;
-				break;
-			}
-				
-			qint64 read = source->read(m_buffer.data(), m_buffer.size());
+			char buf[networkBufferSize];
+			qint64 read = source->read(buf, sizeof(buf));
+			//qDebug() << "Read" << read;
 			if(read <= 0) {
 				if(read < 0) {
 					qDebug() << "Error reading";
 					m_transfer_error = true;
 					m_stop_transfer = true;
-				}
-				
-				break;
-			} else {
-				//qDebug() << "Read" << read;
-				m_write_size = m_to_be_written = read;
-				Q_ASSERT(m_write_size <= m_buffer.size());
-			}
+				} else if(!source->isSequential())
+					m_stop_transfer = true;
+			} else if(read != sink->write(buf, read)) {
+				qDebug() << "Error writing";
+				m_transfer_error = true;
+				m_stop_transfer = true;
+			} else if(source->isSequential()) {
+				//qDebug() << "Continue read";
+				continue;
+			}	
+			
+			break;
 		}
 
 		if(m_stop_transfer) {
@@ -251,9 +231,13 @@ void neteK::FtpHandlerPASV::handleNewClient()
 
 void neteK::FtpHandlerPASV::status()
 {
+	//qDebug() << __FUNCTION__;
+
 	if(!m_socket)
 		return;
 
+	//qDebug() << __FUNCTION__ << m_socket->state();
+	
 	if(m_socket->state() == QAbstractSocket::UnconnectedState)
 		emitTransferStatus(!transferError());
 }

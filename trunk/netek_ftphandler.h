@@ -11,8 +11,6 @@ class FtpHandlerData: public QObject {
 	Q_OBJECT;
 	
 	bool m_start, m_transfer;
-	qint64 m_to_be_written, m_write_size;
-	QByteArray m_buffer;
 	bool m_transfer_error;
 	bool m_stop_transfer;
 	
