@@ -55,8 +55,7 @@ bool neteK::Shares::deleteShareWithQuestion(int i)
 	QPointer<Share> sh = share(i);
 	if(sh && QMessageBox::Yes == QMessageBox::question(0,
 				qApp->applicationName(),
-				QString(tr("Do you really want to delete share %1?"))
-					.arg(sh->niceId()),
+				tr("Do you really want to delete share %1?").arg(sh->niceId()),
 				QMessageBox::Yes,
 				QMessageBox::No | QMessageBox::Default))
 	{

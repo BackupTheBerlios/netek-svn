@@ -3,6 +3,7 @@
 #include "netek_sharesettings.h"
 #include "netek_ftphandler.h"
 #include "netek_netutils.h"
+#include "netek_application.h"
 
 neteK::Share::Share()
 : m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_client_count(0)
@@ -45,13 +46,17 @@ void neteK::Share::usernamePassword(QString &u, QString &p) const
 	p = m_password;
 }
 
-bool neteK::Share::authenticate(QString username, QString password) const
+bool neteK::Share::authenticate(QString who, QString username, QString password) const
 {
-	if(m_access == AccessAnonymous && username == "anonymous")
+	if(m_access == AccessAnonymous && username == "anonymous") {
+		logAction(who, tr("authenticated as a guest"));
 		return true;
+	}
 
-	if(m_access == AccessUsernamePassword)
-		return m_username.size() && m_password.size() && m_username == username && m_password == password;
+	if(m_access == AccessUsernamePassword && m_username.size() && m_password.size() && m_username == username && m_password == password) {
+		logAction(who, tr("authenticated as user %1").arg(username));
+		return true;
+	}
 
 	return false;
 }
@@ -86,10 +91,11 @@ void neteK::Share::handleNewClient()
 			break;
 
 		++m_client_count;
-		connect(client, SIGNAL(destroyed()), SLOT(clientGone()));
 		
 		QPointer<FtpHandler> handler = new FtpHandler(this, client);
 		handler->setParent(m_server);
+		
+		connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
 
 		{
 			QHostAddress local = client->localAddress();
@@ -116,7 +122,11 @@ void neteK::Share::checkServer()
 		m_server = new QTcpServer(this);
 		connect(m_server, SIGNAL(newConnection()), SLOT(handleNewClient()));
 
-		if(!m_server->listen(QHostAddress::Any, m_port)) {
+		if(m_server->listen(QHostAddress::Any, m_port)) {
+			new ObjectLog(m_server,
+				tr("Share started: %1").arg(niceId()),
+				tr("Share stopped: %1").arg(niceId()));
+		} else {
 			m_server->deleteLater();
 			m_server = 0;
 			QTimer::singleShot(1000, this, SLOT(checkServer()));
@@ -207,15 +217,19 @@ bool neteK::Share::changeCurrentFolder(QString cwd, QString path, QString &newcw
 	return false;
 }
 
-bool neteK::Share::rename(QString cwd, QString path1, QString path2) const
+bool neteK::Share::rename(QString who, QString cwd, QString path1, QString path2) const
 {
-	if(m_readonly)
-		return 0;
-		
-	return filesystemPathNotRoot(cwd, path1, path1)
+	bool ret =
+		!m_readonly
+		&& filesystemPathNotRoot(cwd, path1, path1)
 		&& filesystemPathNotRoot(cwd, path2, path2)
 		&& !(path2+'/').startsWith(path1+'/') // this prevents Qt from going into infinite loop
 		&& QFile(path1).rename(path2);
+		
+	if(ret)
+		logAction(who, tr("renamed %1 into %2").arg(path1).arg(path2));
+	
+	return ret;
 }
 
 bool neteK::Share::fileInformation(QString cwd, QString path, QFileInfo &info) const
@@ -241,30 +255,43 @@ bool neteK::Share::listFolder(QString cwd, QString path, QFileInfoList &list) co
 	return false;
 }
 
-bool neteK::Share::createFolder(QString cwd, QString path) const
+bool neteK::Share::createFolder(QString who, QString cwd, QString path) const
 {
-	if(m_readonly)
-		return 0;
-
-	return filesystemPathNotRoot(cwd, path, path) && QDir().mkdir(path);
+	bool ret =
+		!m_readonly
+		&& filesystemPathNotRoot(cwd, path, path)
+		&& QDir().mkdir(path);
+		
+	if(ret)
+		logAction(who, tr("folder created: %1").arg(path));
+		
+	return ret;
 }
 
-bool neteK::Share::deleteFolder(QString cwd, QString path) const
+bool neteK::Share::deleteFolder(QString who, QString cwd, QString path) const
 {
-	if(m_readonly)
-		return 0;
-
-	return filesystemPathNotRoot(cwd, path, path) && QDir().rmdir(path);
+	bool ret =
+		!m_readonly
+		&& filesystemPathNotRoot(cwd, path, path)
+		&& QDir().rmdir(path);
+		
+	if(ret)
+		logAction(who, tr("folder deleted: %1").arg(path));
+		
+	return ret;
 }
 
-QFile *neteK::Share::readFile(QString cwd, QString path, qint64 pos) const
+QFile *neteK::Share::readFile(QString who, QString cwd, QString path, qint64 pos) const
 {
 	if(filesystemPathNotRoot(cwd, path, path)) {
 		QPointer<QFile> file(new QFile(path));
 		if(file->open(QIODevice::ReadOnly)
 			&& pos >= 0 && pos <= file->size()
 			&& (pos == 0 || file->seek(pos)))
+		{
+			logAction(who, tr("downloading file %1").arg(path));
 			return file;
+		}
 			
 		delete file;
 	}
@@ -272,15 +299,17 @@ QFile *neteK::Share::readFile(QString cwd, QString path, qint64 pos) const
 	return 0;
 }
 
-QFile *neteK::Share::writeFile(QString cwd, QString path, bool append) const
+QFile *neteK::Share::writeFile(QString who, QString cwd, QString path, bool append) const
 {
 	if(m_readonly)
 		return 0;
 		
 	if(filesystemPathNotRoot(cwd, path, path)) {
 		QPointer<QFile> file(new QFile(path));
-		if(file->open(append ? QIODevice::Append : QIODevice::WriteOnly))
+		if(file->open(append ? QIODevice::Append : QIODevice::WriteOnly)) {
+			logAction(who, tr("uploading into file %1").arg(path));
 			return file;
+		}
 			
 		delete file;
 	}
@@ -288,7 +317,7 @@ QFile *neteK::Share::writeFile(QString cwd, QString path, bool append) const
 	return 0;
 }
 
-QFile *neteK::Share::writeFileUnique(QString cwd, QString &fname) const
+QFile *neteK::Share::writeFileUnique(QString who, QString cwd, QString &fname) const
 {
 	if(m_readonly)
 		return 0;
@@ -298,10 +327,13 @@ QFile *neteK::Share::writeFileUnique(QString cwd, QString &fname) const
 		QString prefix(QString("ftp_%1_%2").arg(time(0)).arg(rand() & 0xffff));
 		for(int i=0; i<100; ++i) {
 			fname = QString("%1_%2").arg(prefix).arg(i);
-			QPointer<QFile> file(new QFile(QDir(path).filePath(fname)));
+			QString fpath = QDir(path).filePath(fname);			
+			QPointer<QFile> file(new QFile(fpath));
 	
-			if(!file->exists() && file->open(QIODevice::WriteOnly))
+			if(!file->exists() && file->open(QIODevice::WriteOnly)) {
+				logAction(who, tr("uploading into unique file %1").arg(fpath));
 				return file;
+			}
 	
 			delete file;
 		}
@@ -310,12 +342,17 @@ QFile *neteK::Share::writeFileUnique(QString cwd, QString &fname) const
 	return 0;
 }
 
-bool neteK::Share::deleteFile(QString cwd, QString path) const
+bool neteK::Share::deleteFile(QString who, QString cwd, QString path) const
 {
-	if(m_readonly)
-		return 0;
-
-	return filesystemPathNotRoot(cwd, path, path) && QFile(path).remove();
+	bool ret =
+		!m_readonly
+		&& filesystemPathNotRoot(cwd, path, path)
+		&& QFile(path).remove();
+		
+	if(ret)
+		logAction(who, tr("file deleted: %1").arg(path));
+		
+	return ret;
 }
 
 bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) const
@@ -368,4 +405,9 @@ bool neteK::Share::filesystemPath(QString cwd, QString path, QString &fspath, bo
 	qDebug() << "--- Filesystem path:" << fspath;
 	
 	return true;
+}
+
+void neteK::Share::logAction(QString who, QString what) const
+{
+	Application::log()->logLine(QString("(%1) %2").arg(who).arg(what));
 }

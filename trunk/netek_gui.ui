@@ -92,17 +92,9 @@
      <x>0</x>
      <y>0</y>
      <width>689</width>
-     <height>23</height>
+     <height>33</height>
     </rect>
    </property>
-   <widget class="QMenu" name="menu_File" >
-    <property name="title" >
-     <string>&amp;Actions</string>
-    </property>
-    <addaction name="action_Global_settings" />
-    <addaction name="separator" />
-    <addaction name="action_Quit" />
-   </widget>
    <widget class="QMenu" name="menu_Share" >
     <property name="title" >
      <string>&amp;Share</string>
@@ -113,6 +105,15 @@
     <addaction name="actionStart" />
     <addaction name="actionStop" />
     <addaction name="actionCopy_link" />
+   </widget>
+   <widget class="QMenu" name="menu_File" >
+    <property name="title" >
+     <string>&amp;Actions</string>
+    </property>
+    <addaction name="actionShow_log" />
+    <addaction name="action_Global_settings" />
+    <addaction name="separator" />
+    <addaction name="action_Quit" />
    </widget>
    <addaction name="menu_File" />
    <addaction name="menu_Share" />
@@ -198,6 +199,14 @@
    </property>
    <property name="text" >
     <string>Copy &amp;link</string>
+   </property>
+  </action>
+  <action name="actionShow_log" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/toggle_log.png</iconset>
+   </property>
+   <property name="text" >
+    <string>Show &amp;log</string>
    </property>
   </action>
  </widget>

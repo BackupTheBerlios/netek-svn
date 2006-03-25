@@ -5,6 +5,9 @@
 #include "netek_trayicon.h"
 #include "netek_settings.h"
 #include "netek_netutils.h"
+#include "netek_logviewer.h"
+
+// TODO: copy link in tray menu
 
 namespace neteK {
 
@@ -121,7 +124,7 @@ neteK::Gui::Gui()
 : m_save_geometry_timer(false)
 {
 	ui.setupUi(this);
-
+	
 	m_icon = makeTrayIcon(this);
 	if(m_icon) {
 		m_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater()));
@@ -151,6 +154,7 @@ neteK::Gui::Gui()
 	connect(ui.action_Global_settings, SIGNAL(triggered()), SLOT(globalSettings()));
 	connect(ui.action_Quit, SIGNAL(triggered()), SIGNAL(quit()));
 	connect(ui.actionCopy_link, SIGNAL(triggered()), SLOT(copyLinkMenu()));
+	connect(ui.actionShow_log, SIGNAL(triggered()), SLOT(showLog()));
 
 	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
 
@@ -233,6 +237,7 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 	menu.addAction(ui.action_FTP_shares);
 	menu.setDefaultAction(ui.action_FTP_shares);
 	menu.addAction(ui.action_Create_share);
+	menu.addAction(ui.actionShow_log);
 	menu.addAction(ui.action_Global_settings);
 	menu.addAction(ui.action_Quit);
 
@@ -395,6 +400,18 @@ void neteK::Gui::copyLinkMenu()
 	QPointer<Share> sh = currentShare();
 	if(sh && sh->status() != Share::StatusUnconfigured)
 		CopyLinkMenu(sh->URLProtocol(), sh->port()).exec(QCursor::pos());
+}
+
+void neteK::Gui::showLog()
+{
+	if(m_log_viewer) {
+		m_log_viewer->activateWindow();
+		m_log_viewer->raise();
+	} else {
+		m_log_viewer = new LogViewer;
+		m_log_viewer->setAttribute(Qt::WA_DeleteOnClose);
+		m_log_viewer->show();
+	}
 }
 
 #include "netek_gui.moc"

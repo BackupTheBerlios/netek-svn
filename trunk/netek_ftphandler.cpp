@@ -2,10 +2,12 @@
 #include "netek_settings.h"
 #include "netek_ftphandler.h"
 #include "netek_netutils.h"
+#include "netek_application.h"
 
 // TODO: no space left on disk test
 // TODO: fix socket speed - unbuffered sockets?
 // TODO: site chmod
+// TODO: recheck m_control
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
@@ -246,6 +248,10 @@ void neteK::FtpHandlerPASV::status()
 neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 : m_share(s), m_control(control), m_control_channel_blocked(false)
 {
+	new ObjectLog(this,
+		tr("New FTP client: %1").arg(m_control->peerAddress().toString()),
+		tr("FTP client is gone: %1").arg(m_control->peerAddress().toString()));
+		
 	Settings settings;
 
 	m_control->setParent(this);
@@ -321,10 +327,14 @@ void neteK::FtpHandler::init()
 void neteK::FtpHandler::start(QHostAddress publ)
 {
 	m_public = publ;
-
-	connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
-	connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
-	connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
+	logAction(tr("using %1 as a public address").arg(m_public.toString()));
+	
+	if(m_control) {
+		connect(m_control, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(processSignal()));
+		connect(m_control, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(processSignal()));
+		connect(m_control, SIGNAL(readyRead()), SIGNAL(processSignal()));
+	}
+	
 	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
 
 	init();
@@ -395,7 +405,7 @@ void neteK::FtpHandler::command_USER(QString args)
 
 void neteK::FtpHandler::command_PASS(QString args)
 {
-	if(m_share->authenticate(m_username, args)) {
+	if(m_share->authenticate(me(), m_username, args)) {
 		m_loggedin = true;
 		sendLine(230, "User logged in, proceed.");
 	} else {
@@ -421,7 +431,7 @@ void neteK::FtpHandler::command_RNFR(QString args)
 
 void neteK::FtpHandler::command_RNTO(QString args)
 {
-	if(m_share->rename(m_cwd, m_rename_from, args))
+	if(m_share->rename(me(), m_cwd, m_rename_from, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(553, "Requested action not taken.");
@@ -783,7 +793,7 @@ void neteK::FtpHandler::command_REST(QString args)
 
 void neteK::FtpHandler::command_RETR(QString args)
 {
-	QPointer<QFile> file = m_share->readFile(m_cwd, args, m_rest >= 0 ? m_rest : 0);
+	QPointer<QFile> file = m_share->readFile(me(), m_cwd, args, m_rest >= 0 ? m_rest : 0);
 	if(file)
 		startDataChannel(file, true);
 	else
@@ -799,7 +809,7 @@ void neteK::FtpHandler::command_STOU(QString)
 	}
 
 	QString tmp;
-	QPointer<QFile> file = m_share->writeFileUnique(m_cwd, tmp);
+	QPointer<QFile> file = m_share->writeFileUnique(me(), m_cwd, tmp);
 	if(file) {
 		m_store_unique = tmp;
 		startDataChannel(file, false);
@@ -816,7 +826,7 @@ void neteK::FtpHandler::command_STOR(QString args)
 		return;
 	}
 
-	QPointer<QFile> file = m_share->writeFile(m_cwd, args);
+	QPointer<QFile> file = m_share->writeFile(me(), m_cwd, args);
 	if(file)
 		startDataChannel(file, false);
 	else
@@ -831,7 +841,7 @@ void neteK::FtpHandler::command_APPE(QString args)
 		return;
 	}
 
-	QPointer<QFile> file = m_share->writeFile(m_cwd, args, true);
+	QPointer<QFile> file = m_share->writeFile(me(), m_cwd, args, true);
 	if(file)
 		startDataChannel(file, false);
 	else
@@ -840,7 +850,7 @@ void neteK::FtpHandler::command_APPE(QString args)
 
 void neteK::FtpHandler::command_DELE(QString args)
 {
-	if(m_share->deleteFile(m_cwd, args))
+	if(m_share->deleteFile(me(), m_cwd, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(550, "Requested action not taken.");
@@ -848,7 +858,7 @@ void neteK::FtpHandler::command_DELE(QString args)
 
 void neteK::FtpHandler::command_RMD(QString args)
 {
-	if(m_share->deleteFolder(m_cwd, args))
+	if(m_share->deleteFolder(me(), m_cwd, args))
 		sendLine(250, "Requested file action okay, completed.");
 	else
 		sendLine(550, "Requested action not taken.");
@@ -857,7 +867,7 @@ void neteK::FtpHandler::command_RMD(QString args)
 void neteK::FtpHandler::command_MKD(QString args)
 {
 	QString resolved;
-	if(m_share->resolvePath(m_cwd, args, resolved) && m_share->createFolder(m_cwd, args))
+	if(m_share->resolvePath(m_cwd, args, resolved) && m_share->createFolder(me(), m_cwd, args))
 		sendLine(257, QString("%1 created.").arg(quotedPath(resolved)));
 	else
 		sendLine(550, "Requested action not taken.");
@@ -993,4 +1003,17 @@ void neteK::FtpHandler::process()
 		} else
 			sendLine(502, "Command not implemented.");
 	}
+}
+
+QString neteK::FtpHandler::me()
+{
+	if(m_control)
+		return tr("FTP client %1").arg(m_control->peerAddress().toString());
+		
+	return tr("FTP client");
+}
+
+void neteK::FtpHandler::logAction(QString what)
+{
+	Application::log()->logLine(QString("(%1) %2").arg(me()).arg(what));
 }

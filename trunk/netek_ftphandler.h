@@ -149,6 +149,8 @@ class FtpHandler: public QObject {
 	bool list(QString path, QFileInfoList &lst, bool *dir = 0);
 	static QString quotedPath(QString path);
 	static QString month(int m);
+	QString me();
+	void logAction(QString what);
 	
 signals:
 	void processSignal();

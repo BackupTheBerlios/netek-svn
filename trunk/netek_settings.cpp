@@ -12,6 +12,12 @@ quint16 neteK::Settings::randomTcpPortMax()
 void neteK::Settings::setRandomTcpPortMax(quint16 port)
 { setValue("randomTcpPort/max", port); }
 
+int neteK::Settings::logKBytes()
+{ return value("log/KBytes", 1000).toInt(); }
+
+void neteK::Settings::setLogKBytes(int kb)
+{ setValue("log/KBytes", kb); }
+
 neteK::Settings::PublicAddress neteK::Settings::publicAddress()
 { return (PublicAddress)value("publicAddress", PublicAddressAutodetect).toInt(); }
 
@@ -29,6 +35,12 @@ void neteK::Settings::setGuiGeometry(QRect rect)
 
 QRect neteK::Settings::guiGeometry()
 { return value("gui/geometry").toRect(); }
+
+void neteK::Settings::setLogViewerGeometry(QRect rect)
+{ setValue("logViewer/geometry", rect); }
+
+QRect neteK::Settings::logViewerGeometry()
+{ return value("logViewer/geometry").toRect(); }
 
 QList<int> neteK::Settings::guiShareListColumns()
 {

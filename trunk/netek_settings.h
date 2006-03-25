@@ -13,6 +13,9 @@ public:
 	quint16 randomTcpPortMax();
 	void setRandomTcpPortMax(quint16 port);
 	
+	int logKBytes();
+	void setLogKBytes(int kb);
+	
 	enum PublicAddress { PublicAddressAutodetect, PublicAddressManual };
 	
 	PublicAddress publicAddress();
@@ -23,6 +26,9 @@ public:
 	
 	QRect guiGeometry();
 	void setGuiGeometry(QRect rect);
+	
+	QRect logViewerGeometry();
+	void setLogViewerGeometry(QRect rect);
 	
 	QList<int> guiShareListColumns();
 	void setGuiShareListColumns(QList<int> slc);

@@ -10,6 +10,7 @@
         <file>icons/player_play.png</file>
         <file>icons/player_stop.png</file>
         <file>icons/remove.png</file>
+        <file>icons/toggle_log.png</file>
         <file>icons/www.png</file>
     </qresource>
 </RCC>

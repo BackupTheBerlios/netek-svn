@@ -57,16 +57,16 @@ class Share: public QObject {
 		
 		QString initialFolder() const;
 		bool changeCurrentFolder(QString cwd, QString change, QString &newcwd) const;
-		bool rename(QString cwd, QString path, QString path2) const;
+		bool rename(QString who, QString cwd, QString path, QString path2) const;
 		bool fileInformation(QString cwd, QString path, QFileInfo &info) const;
 		bool listFolder(QString cwd, QString path, QFileInfoList &list) const;
-		bool authenticate(QString username, QString password) const;
-		QFile *readFile(QString cwd, QString path, qint64 pos = 0) const;
-		QFile *writeFile(QString cwd, QString path, bool append = false) const;
-		QFile *writeFileUnique(QString cwd, QString &name) const;
-		bool deleteFile(QString cwd, QString path) const;
-		bool createFolder(QString cwd, QString path) const;
-		bool deleteFolder(QString cwd, QString path) const;
+		bool authenticate(QString who, QString username, QString password) const;
+		QFile *readFile(QString who, QString cwd, QString path, qint64 pos = 0) const;
+		QFile *writeFile(QString who, QString cwd, QString path, bool append = false) const;
+		QFile *writeFileUnique(QString who, QString cwd, QString &name) const;
+		bool deleteFile(QString who, QString cwd, QString path) const;
+		bool createFolder(QString who, QString cwd, QString path) const;
+		bool deleteFolder(QString who, QString cwd, QString path) const;
 		
 		bool resolvePath(QString cwd, QString path, QString &resolved) const;
 
@@ -81,6 +81,8 @@ class Share: public QObject {
 		int m_client_count;
 		
 		bool filesystemPath(QString cwd, QString path, QString &fspath, bool nonroot) const;
+		
+		void logAction(QString who, QString what) const;
 		
 		inline bool filesystemPath(QString cwd, QString path, QString &fspath) const
 		{ return filesystemPath(cwd, path, fspath, false); }

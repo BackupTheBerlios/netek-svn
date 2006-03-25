@@ -9,12 +9,19 @@ namespace neteK {
 
 class Share;
 class Shares;
+class LogViewer;
 
 class Gui: public QMainWindow {
 	Q_OBJECT;
 	
+	Ui::Gui ui;
+	
 	QPointer<QObject> m_icon;
 	bool m_save_geometry_timer;
+	QPointer<Shares> m_shares;
+	QPointer<LogViewer> m_log_viewer;
+	
+	Share *currentShare();
 	
 public:
 	Gui();
@@ -22,12 +29,6 @@ public:
 	void closeEvent(QCloseEvent *);
 	void resizeEvent(QResizeEvent *);
 	void moveEvent(QMoveEvent *);
-
-private:
-	Ui::Gui ui;
-	
-	QPointer<Shares> m_shares;
-	Share *currentShare();
 	
 signals:
 	void quit();
@@ -46,6 +47,7 @@ public slots:
 	void saveGeometryTimer();
 	void shareMenu();
 	void copyLinkMenu();
+	void showLog();
 };
 
 }
