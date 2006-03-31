@@ -7,7 +7,7 @@
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
 
-// TODO: DnD folders
+// TODO: DnD folders on win32
 
 namespace neteK {
 
@@ -369,6 +369,55 @@ QPixmap neteK::Gui::shareIcon(Share *sh)
 	}
 }
 
+bool neteK::Gui::getDragAndDropPath(QString text, QString &path)
+{
+	{
+		QUrl url(text, QUrl::StrictMode);
+		if(url.isValid()) {
+			if(url.scheme().size() == 0)
+				;
+			else if(url.scheme() == "file")
+				text = url.path();
+			else
+				return false;
+		}
+	}
+	
+	{
+		QFileInfo info(text);
+		if(info.isFile())
+			text = info.path();
+	}
+	
+	{
+		QFileInfo info(text);
+		if(info.isDir()) {
+			path = info.canonicalFilePath();
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)
+{
+	qDebug() << "DnD MIME:" << e->mimeData()->formats();
+	qDebug() << "DnD text:" << e->mimeData()->text();
+	
+	QString path;
+	if(getDragAndDropPath(e->mimeData()->text(), path)) {
+		e->setDropAction(Qt::LinkAction); // TODO: check this...
+		e->acceptProposedAction();
+	}
+}
+
+void neteK::Gui::dropEvent(QDropEvent *e)
+{
+	QString path;
+	if(getDragAndDropPath(e->mimeData()->text(), path))
+		m_shares->createShareWithSettings(path);
+}
 
 void neteK::Gui::sharesChanged()
 {

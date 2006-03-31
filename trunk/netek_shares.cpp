@@ -33,9 +33,10 @@ neteK::Share *neteK::Shares::share(int i) const
 }
 
 
-int neteK::Shares::createShareWithSettings()
+int neteK::Shares::createShareWithSettings(QString path)
 {
 	QPointer<Share> s = new Share;
+	s->setFolder(path);
 	if(s->showSettings()) {
 		int ret = m_shares.size();
 		m_shares.append(s);

@@ -14,7 +14,7 @@ class Shares: public QObject {
 		void initShare(Share *);
 
 	public slots:
-		int createShareWithSettings();
+		int createShareWithSettings(QString path = "");
 		bool deleteShareWithQuestion(int i);
 		void settingsChanged();
 		

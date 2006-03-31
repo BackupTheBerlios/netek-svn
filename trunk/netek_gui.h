@@ -25,6 +25,7 @@ class Gui: public QMainWindow {
 	static QPixmap shareIcon(Share *sh);
 	static bool validAndConfigured(Share *sh);
 	void makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, int i, QAction *a);
+	static bool getDragAndDropPath(QString text, QString &path);
 	
 public:
 	Gui();
@@ -32,6 +33,8 @@ public:
 	void closeEvent(QCloseEvent *);
 	void resizeEvent(QResizeEvent *);
 	void moveEvent(QMoveEvent *);
+	void dragEnterEvent(QDragEnterEvent *e);
+	void dropEvent(QDropEvent *e);
 	
 signals:
 	void quit();
