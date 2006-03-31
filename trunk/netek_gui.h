@@ -21,7 +21,10 @@ class Gui: public QMainWindow {
 	QPointer<Shares> m_shares;
 	QPointer<LogViewer> m_log_viewer;
 	
-	Share *currentShare();
+	Share *getShare(int id = -1);
+	static QPixmap shareIcon(Share *sh);
+	static bool validAndConfigured(Share *sh);
+	void makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, int i, QAction *a);
 	
 public:
 	Gui();
@@ -35,10 +38,10 @@ signals:
 	
 public slots:
 	void toggleRunStatus();
-	void shareSettings();
-	void deleteShare();
-	void startShare();
-	void stopShare();
+	void shareSettings(int id = -1);
+	void deleteShare(int id = -1);
+	void startShare(int id = -1);
+	void stopShare(int id = -1);
 	void sharesChanged();
 	void globalSettings();
 	void toggleVisible();
@@ -46,7 +49,7 @@ public slots:
 	void saveGeometry();
 	void saveGeometryTimer();
 	void shareMenu();
-	void copyLinkMenu();
+	void copyLinkMenu(int id = -1);
 	void showLog();
 };
 

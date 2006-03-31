@@ -7,7 +7,7 @@
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
 
-// TODO: copy link in tray menu
+// TODO: DnD folders
 
 namespace neteK {
 
@@ -231,14 +231,64 @@ void neteK::Gui::toggleVisible()
     }
 }
 
+bool neteK::Gui::validAndConfigured(Share *sh)
+{ return sh && sh->status() != Share::StatusUnconfigured; }
+
+void neteK::Gui::makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, int i, QAction *a)
+{
+	QPointer<QAction> new_a = m->addAction(a->icon(), a->text());
+	sm->setMapping(new_a, i);
+	if(a == ui.actionStart)
+		new_a->setEnabled(!sh->runStatus());
+	else if(a == ui.actionStop)
+		new_a->setEnabled(sh->runStatus());
+		
+	connect(new_a, SIGNAL(triggered()), sm, SLOT(map()));
+}
+
 void neteK::Gui::trayMenu(const QPoint &pos)
 {
 	QMenu menu(qApp->applicationName());
 	menu.addAction(ui.action_FTP_shares);
 	menu.setDefaultAction(ui.action_FTP_shares);
+	menu.addSeparator();
 	menu.addAction(ui.action_Create_share);
+	
+	QPointer<QMenu> smenu = new QMenu(tr("&Shares"), &menu);
+	smenu->setIcon(QPixmap(":/icons/folder_open.png"));
+	menu.addMenu(smenu);
+	
+	{
+		QList<QPointer<QSignalMapper> > mappers;
+		for(int i=0; i<5; ++i)
+			mappers.append(new QSignalMapper(smenu));
+			
+		connect(mappers.at(0), SIGNAL(mapped(int)), SLOT(copyLinkMenu(int)));
+		connect(mappers.at(1), SIGNAL(mapped(int)), SLOT(shareSettings(int)));
+		connect(mappers.at(2), SIGNAL(mapped(int)), SLOT(startShare(int)));
+		connect(mappers.at(3), SIGNAL(mapped(int)), SLOT(stopShare(int)));
+		connect(mappers.at(4), SIGNAL(mapped(int)), SLOT(deleteShare(int)));
+			
+		for(int i=0; i<m_shares->shares(); ++i) {
+			QPointer<Share> sh = m_shares->share(i);
+			if(validAndConfigured(sh)) {
+				QPointer<QMenu> shmenu = new QMenu(sh->niceId(), smenu);
+				shmenu->setIcon(shareIcon(sh));
+				smenu->addMenu(shmenu);
+				
+				makeMappedShareAction(sh, shmenu, mappers.at(0), i, ui.actionCopy_link);
+				makeMappedShareAction(sh, shmenu, mappers.at(1), i, ui.actionSettings);
+				makeMappedShareAction(sh, shmenu, mappers.at(2), i, ui.actionStart);
+				makeMappedShareAction(sh, shmenu, mappers.at(3), i, ui.actionStop);
+				makeMappedShareAction(sh, shmenu, mappers.at(4), i, ui.actionDelete);
+			}
+		}
+	}
+	
+	menu.addSeparator();
 	menu.addAction(ui.actionShow_log);
 	menu.addAction(ui.action_Global_settings);
+	menu.addSeparator();
 	menu.addAction(ui.action_Quit);
 
 	menu.exec(pos);
@@ -246,8 +296,8 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 
 void neteK::Gui::shareMenu()
 {
-	QPointer<Share> sh = currentShare();
-	if(sh && sh->status() != Share::StatusUnconfigured) {
+	QPointer<Share> sh = getShare();
+	if(validAndConfigured(sh)) {
 		QMenu menu;
 		menu.addAction(ui.actionCopy_link);
 		menu.addAction(ui.actionSettings);
@@ -259,40 +309,46 @@ void neteK::Gui::shareMenu()
 	}
 }
 
-neteK::Share *neteK::Gui::currentShare()
+neteK::Share *neteK::Gui::getShare(int id)
 {
-	return m_shares->share(ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
+	return m_shares->share(
+		id >= 0
+			? id
+			: ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
 }
 
-void neteK::Gui::shareSettings()
+void neteK::Gui::shareSettings(int id)
 {
-	QPointer<Share> sh = currentShare();
+	QPointer<Share> sh = getShare(id);
 	if(sh)
 		sh->showSettings();
 }
 
-void neteK::Gui::deleteShare()
+void neteK::Gui::deleteShare(int id)
 {
-	m_shares->deleteShareWithQuestion(ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
+	m_shares->deleteShareWithQuestion(
+		id >= 0
+			? id
+			: ui.shareList->indexOfTopLevelItem(ui.shareList->currentItem()));
 }
 
-void neteK::Gui::startShare()
+void neteK::Gui::startShare(int id)
 {
-	QPointer<Share> sh = currentShare();
+	QPointer<Share> sh = getShare(id);
 	if(sh)
 		sh->startIfStopped();
 }
 
-void neteK::Gui::stopShare()
+void neteK::Gui::stopShare(int id)
 {
-	QPointer<Share> sh = currentShare();
+	QPointer<Share> sh = getShare(id);
 	if(sh)
 		sh->stop();
 }
 
 void neteK::Gui::toggleRunStatus()
 {
-	QPointer<Share> sh = currentShare();
+	QPointer<Share> sh = getShare();
 	if(sh) {
 		if(sh->runStatus())
 			sh->stop();
@@ -300,6 +356,19 @@ void neteK::Gui::toggleRunStatus()
 			sh->startIfStopped();
 	}
 }
+
+QPixmap neteK::Gui::shareIcon(Share *sh)
+{
+	switch(sh->status()) {
+		case Share::StatusStarted:
+			return QPixmap(":/icons/folder_open.png");
+		case Share::StatusStopped:
+			return QPixmap(":/icons/folder_grey.png");
+		default:
+			return QPixmap(":/icons/exec.png");
+	}
+}
+
 
 void neteK::Gui::sharesChanged()
 {
@@ -322,7 +391,6 @@ void neteK::Gui::sharesChanged()
 
 				{
 					QFont font = item->font(0);
-					//font.setPointSize(font.pointSize()+1);
 					font.setBold(true);
 					for(int j=0; j<ui.shareList->columnCount(); ++j)
 						item->setFont(j, font);
@@ -331,7 +399,7 @@ void neteK::Gui::sharesChanged()
 				ui.shareList->addTopLevelItem(item);
 			}
 
-			item->setText(0, /*" " +*/ sh->folder());
+			item->setText(0, sh->folder());
 			item->setText(1, QString::number(sh->port()));
 
 			{
@@ -347,41 +415,27 @@ void neteK::Gui::sharesChanged()
 					item->setText(2, "-");
 			}
 
-			QPixmap icon;
-			//QColor bg;
 			QString status;
 			switch(sh->status()) {
 				case Share::StatusStarted:
 					status = tr("started");
-					//bg = QColor(0xff, 0xff, 0xff);
-					icon = QPixmap(":/icons/folder_open.png");
 					break;
 				case Share::StatusStopped:
 					status = tr("stopped");
-					//bg = QColor(0xcc, 0xcc, 0xcc);
-					icon = QPixmap(":/icons/folder_grey.png");
 					break;
 				default:
 					status = tr("processing");
-					//bg = QColor(0xff, 0x99, 0x99);
-					icon = QPixmap(":/icons/exec.png");
 			}
 
-			item->setIcon(0, icon);
+			item->setIcon(0, shareIcon(sh));
 			item->setText(3, status);
 			item->setText(4, QString::number(sh->clients()));
-
-			//if(sh->clients())
-			//	bg = QColor(0xff, 0xff, 0x66);
-
-			//for(int j=0; j<ui.shareList->columnCount(); ++j)
-			//	item->setBackgroundColor(j, bg);
 		}
 	}
 
 	{
-		QPointer<Share> sh = currentShare();
-		bool ok = sh && sh->status() != Share::StatusUnconfigured;
+		QPointer<Share> sh = getShare();
+		bool ok = validAndConfigured(sh);
 		ui.actionDelete->setEnabled(ok);
 		ui.actionSettings->setEnabled(ok);
 		ui.actionStart->setEnabled(ok && !sh->runStatus());
@@ -395,10 +449,10 @@ void neteK::Gui::globalSettings()
 	GlobalSettings().exec();
 }
 
-void neteK::Gui::copyLinkMenu()
+void neteK::Gui::copyLinkMenu(int id)
 {
-	QPointer<Share> sh = currentShare();
-	if(sh && sh->status() != Share::StatusUnconfigured)
+	QPointer<Share> sh = getShare(id);
+	if(validAndConfigured(sh))
 		CopyLinkMenu(sh->URLProtocol(), sh->port()).exec(QCursor::pos());
 }
 
