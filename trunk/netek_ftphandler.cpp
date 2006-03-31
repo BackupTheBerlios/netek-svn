@@ -8,6 +8,7 @@
 // TODO: fix socket speed - unbuffered sockets?
 // TODO: site chmod
 // TODO: recheck m_control
+// TODO: finish <cr><nul>
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
