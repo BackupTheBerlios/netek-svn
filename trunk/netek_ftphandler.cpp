@@ -7,7 +7,6 @@
 // TODO: no space left on disk test
 // TODO: fix socket speed - unbuffered sockets?
 // TODO: site chmod
-// TODO: recheck m_control
 // TODO: finish <cr><nul>
 
 neteK::FtpHandlerData::FtpHandlerData()
@@ -452,17 +451,16 @@ void neteK::FtpHandler::command_QUIT(QString)
 
 void neteK::FtpHandler::command_FEAT(QString)
 {
-	if(m_control) {
-		QStringList feats;
-		feats.append("Features:");
-		feats.append("MDTM");
-		feats.append("REST STREAM");
-		feats.append("SIZE");
-		feats.append("UTF8");
-		feats.append("End");
 
-		sendLines(211, feats);
-	}
+	QStringList feats;
+	feats.append("Features:");
+	feats.append("MDTM");
+	feats.append("REST STREAM");
+	feats.append("SIZE");
+	feats.append("UTF8");
+	feats.append("End");
+
+	sendLines(211, feats);
 }
 
 void neteK::FtpHandler::command_OPTS(QString args)
@@ -476,35 +474,33 @@ void neteK::FtpHandler::command_OPTS(QString args)
 
 void neteK::FtpHandler::command_HELP(QString)
 {
-	if(m_control) {
-		QStringList cmds;
-		cmds.append("The following commands are recognized.");
+	QStringList cmds;
+	cmds.append("The following commands are recognized.");
 
-		int cnt = 0;
-		QString buf;
-		foreach(QString cmd, m_commands.keys()) {
-			if(buf.size()) {
+	int cnt = 0;
+	QString buf;
+	foreach(QString cmd, m_commands.keys()) {
+		if(buf.size()) {
+			buf += ' ';
+			while(buf.size() % 5 != 0)
 				buf += ' ';
-				while(buf.size() % 5 != 0)
-					buf += ' ';
-			}
-
-			++cnt;
-			buf += cmd;
-			if(cnt >= 12) {
-				cnt = 0;
-				cmds.append(buf);
-				buf.clear();
-			}
 		}
 
-		if(buf.size())
+		++cnt;
+		buf += cmd;
+		if(cnt >= 12) {
+			cnt = 0;
 			cmds.append(buf);
-
-		cmds.append("Help OK.");
-
-		sendLines(214, cmds);
+			buf.clear();
+		}
 	}
+
+	if(buf.size())
+		cmds.append(buf);
+
+	cmds.append("Help OK.");
+
+	sendLines(214, cmds);
 }
 
 void neteK::FtpHandler::command_STRU(QString args)
