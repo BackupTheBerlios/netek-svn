@@ -17,6 +17,7 @@ neteK::LogViewer::LogViewer()
 	connect(ui.copyToClipboard, SIGNAL(clicked()), SLOT(copyToClipboard()));
 	connect(ui.saveToFile, SIGNAL(clicked()), SLOT(saveToFile()));
 	connect(ui.close, SIGNAL(clicked()), SLOT(reject()));
+	connect(ui.clearLog, SIGNAL(clicked()), SLOT(clearLog()));
 	
 	{
 		QRect geom = settings.logViewerGeometry();
@@ -71,4 +72,10 @@ void neteK::LogViewer::saveToFile()
 			QMessageBox::critical(this, qApp->applicationName(), tr("Error saving file!"),
 				QMessageBox::Cancel, 0);
 	}
+}
+
+void neteK::LogViewer::clearLog()
+{
+	Application::log()->clearLog();
+	ui.logText->setPlainText(QString());
 }

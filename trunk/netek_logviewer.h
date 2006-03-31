@@ -23,6 +23,7 @@ public slots:
 	void copyToClipboard();
 	void saveToFile();
 	void log(QString data);
+	void clearLog();
 };
 
 }

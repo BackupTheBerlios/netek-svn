@@ -214,7 +214,11 @@ void neteK::FtpHandlerPASV::handleNewClient()
 				return;
 
 			if(!(m_address == m_socket->peerAddress())) {
-				// TODO: log warning, very likely crack attempt
+				Application::log()->logLine(
+					tr("Expected IP=%1, got=%2, crack attempt? Dropping connection!")
+						.arg(m_address.toString())
+						.arg(m_socket->peerAddress().toString()));
+						
 				delete m_socket;
 				return;
 			}

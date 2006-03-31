@@ -25,9 +25,10 @@ public:
 	
 	void logLine(QString line);
 	QString readLog();
+	void clearLog();
 
 signals:
-	void appendToLog(QString data);	
+	void appendToLog(QString data);
 };
 
 class Application: public QApplication {

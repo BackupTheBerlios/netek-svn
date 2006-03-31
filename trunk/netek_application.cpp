@@ -91,6 +91,11 @@ neteK::Log::Log()
 : m_file(Application::applicationData().filePath("log.txt"))
 { }
 
+void neteK::Log::clearLog()
+{
+	QFile(m_file).remove();
+}
+
 void neteK::Log::logLine(QString line)
 {
 	if(line.size() == 0)
