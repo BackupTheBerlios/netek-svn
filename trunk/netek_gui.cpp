@@ -371,29 +371,35 @@ QPixmap neteK::Gui::shareIcon(Share *sh)
 
 bool neteK::Gui::getDragAndDropPath(const QMimeData *mime, QString &path)
 {
-	QString text = mime->text();
+	qDebug() << "DnD MIME:" << mime->formats();
+	qDebug() << "DnD text:" << mime->text();
+	qDebug() << "DnD URLs:" << mime->urls();
+	
+	QList<QString> files;
 
-	foreach(QUrl url, mime->urls()) {
-		QString lf = url.toLocalFile();
-		if(lf.size()) {
-			text = lf;
-			break;
-		}
-	}
+	foreach(QUrl url, mime->urls())
+		files.append(url.toLocalFile());
+	
+	files.append(QUrl(mime->text(), QUrl::StrictMode).toLocalFile());
+	files.append(mime->text());
 
-	{
-		qDebug() << "DnD is file?" << text;
-		QFileInfo info(text);
-		if(info.isFile())
-			text = info.path();
-	}
-
-	{
-		qDebug() << "DnD is directory?" << text;
-		QFileInfo info(text);
-		if(info.isDir()) {
-			path = info.canonicalFilePath();
-			return path.size();
+	foreach(QString file, files) {
+		if(file.size() == 0)
+			continue;
+			
+		qDebug() << "DnD is file?" << file;
+		QFileInfo info1(file);
+		if(info1.isFile())
+			file = info1.path();
+		
+		qDebug() << "DnD is directory?" << file;
+		QFileInfo info2(file);
+		if(info2.isDir()) {
+			path = info2.canonicalFilePath();
+			if(path.size()) {
+				qDebug() << "Resolved:" << path;
+				return true;
+			}
 		}
 	}
 
@@ -402,10 +408,6 @@ bool neteK::Gui::getDragAndDropPath(const QMimeData *mime, QString &path)
 
 void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)
 {
-	qDebug() << "DnD MIME:" << e->mimeData()->formats();
-	qDebug() << "DnD text:" << e->mimeData()->text();
-	qDebug() << "DnD URLs:" << e->mimeData()->urls();
-
 	QString path;
 	if(getDragAndDropPath(e->mimeData(), path)) {
 		e->setDropAction(Qt::LinkAction);
