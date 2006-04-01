@@ -10,8 +10,12 @@ neteK::LogViewer::LogViewer()
 
 	{
 		QFont font = ui.logText->font();
+#ifdef Q_OS_UNIX
+		font.setFamily("Monospace");
+#else
 		font.setFamily("");
-		font.setStyleHint(QFont::TypeWriter); // TODO: check on linux
+		font.setStyleHint(QFont::TypeWriter);
+#endif
 		ui.logText->setFont(font);
 	}
 

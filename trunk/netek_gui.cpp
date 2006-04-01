@@ -7,7 +7,7 @@
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
 
-// TODO: DnD folders on linux
+// TODO: file manager integration
 
 namespace neteK {
 
