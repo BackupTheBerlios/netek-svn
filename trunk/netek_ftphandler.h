@@ -126,6 +126,7 @@ class FtpHandler: public QObject {
 
 	QPointer<Share> m_share;
 	QPointer<QAbstractSocket> m_control;
+	QByteArray m_control_buffer;
 	QQueue<QString> m_requests;
 	QPointer<FtpHandlerData> m_data__;
 	bool m_loggedin;

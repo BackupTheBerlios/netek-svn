@@ -5,9 +5,7 @@
 #include "netek_application.h"
 
 // TODO: no space left on disk test
-// TODO: fix socket speed - unbuffered sockets?
 // TODO: site chmod
-// TODO: finish <cr><nul>
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
@@ -876,15 +874,12 @@ void neteK::FtpHandler::command_MKD(QString args)
 
 QByteArray neteK::FtpHandler::makeLine(QString line)
 {
-	QByteArray out;
+	QByteArray out(m_utf8 ? line.toUtf8() : line.toLatin1());
 	{
-		QByteArray tmp(m_utf8 ? line.toUtf8() : line.toLatin1());
-		foreach(char c, tmp)
-			if(c == '\r') {
-				out.append('\r');
-				out.append('\0');
-			} else
-				out.append(c);
+		QByteArray crnul;
+		crnul.append('\r');
+		crnul.append('\0');
+		out.replace('\r', crnul);
 	}
 	out.append("\r\n");
 
@@ -967,13 +962,39 @@ void neteK::FtpHandler::process()
 	}
 
 	if(m_control)
-		while(m_control->canReadLine()) {
-			QString line = QString::fromUtf8(m_control->readLine(10000).constData());
-			while(line.endsWith('\r') || line.endsWith('\n'))
-				line.chop(1);
+		for(;;) {
+			char buf[networkBufferSize];
+			qint64 read = m_control->read(buf, sizeof(buf));
+			if(read < 0) {
+				m_control->close();
+				return;
+			} else if(read == 0)
+				break;
 
-			qDebug() << "<--" << line;
-			m_requests.enqueue(line);
+			m_control_buffer.append(QByteArray(buf, read));
+			if(m_control_buffer.size() > 10000) {
+				m_control->close();
+				return;
+			}
+			
+			for(;;) {
+				int nl = m_control_buffer.indexOf("\r\n");
+				if(nl < 0)
+					break;
+					
+				QByteArray line(m_control_buffer.left(nl));
+				m_control_buffer = m_control_buffer.mid(nl+2);
+				{
+					QByteArray crnul;
+					crnul.append('\r');
+					crnul.append('\0');
+					line.replace(crnul, "\r");
+				}
+				
+				QString ln(m_utf8 ? QString::fromUtf8(line) : QString::fromLatin1(line));
+				qDebug() << "<--" << ln;
+				m_requests.enqueue(ln);
+			}
 		}
 
 	while(!m_control_channel_blocked && m_requests.size()) {
