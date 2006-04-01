@@ -5,7 +5,6 @@
 #include "netek_application.h"
 
 // TODO: no space left on disk test
-// TODO: site chmod
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
@@ -288,7 +287,7 @@ neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
 	ADD_COMMAND(PWD, CommandFlagLoggedIn);
 	ADD_COMMAND(LIST, CommandFlagLoggedIn);
 	ADD_COMMAND(NLST, CommandFlagLoggedIn);
-	//ADD_COMMAND(SITE, 0);
+	ADD_COMMAND(SITE, CommandFlagLoggedIn);
 	ADD_COMMAND(SYST, 0);
 	//ADD_COMMAND(STAT, 0);
 	ADD_COMMAND(HELP, 0);
@@ -470,34 +469,80 @@ void neteK::FtpHandler::command_OPTS(QString args)
 		sendLine(501, "Syntax error in parameters or arguments.");
 }
 
-void neteK::FtpHandler::command_HELP(QString)
+void neteK::FtpHandler::command_SITE(QString line)
+{
+	QString cmd, args;
+	parseLine(line, cmd, args);
+	
+	if(cmd == "CHMOD") {
+		QRegExp rx("([0-9]+) (.+)");
+		uint mode;
+		bool mode_ok;
+		if(!rx.exactMatch(args)
+			|| (mode = rx.cap(1).toUInt(&mode_ok, 8), !mode_ok)
+			|| mode > 0777)
+		{
+			sendLine(501, "Syntax error in parameters or arguments.");
+			return;
+		}
+		
+		QFile::Permissions p = 0;
+#define X(_n, _m) if(mode & _m) p = p | QFile::_n;
+		X(ReadOwner, 0400);
+		X(WriteOwner, 0200);
+		X(ExeOwner, 0100);
+		X(ReadGroup, 040);
+		X(WriteGroup, 020);
+		X(ExeGroup, 010);
+		X(ReadOther, 04);
+		X(WriteOther, 02);
+		X(ExeOther, 01);
+#undef X
+		
+		QPointer<QFile> file = m_share->changeAttributes(me(), m_cwd, rx.cap(2));
+		if(file && file->setPermissions(p))
+			sendLine(200, "Command okay.");
+		else
+			sendLine(550, "Requested action not taken.");
+		
+		delete file;
+	} else
+		sendLine(500, "Syntax error, command unrecognized.");
+}
+
+void neteK::FtpHandler::command_HELP(QString args)
 {
 	QStringList cmds;
-	cmds.append("The following commands are recognized.");
-
-	int cnt = 0;
-	QString buf;
-	foreach(QString cmd, m_commands.keys()) {
-		if(buf.size()) {
-			buf += ' ';
-			while(buf.size() % 5 != 0)
+	
+	if(args.toUpper() == "SITE") {
+		cmds.append("CHMOD");
+	} else {
+		cmds.append("The following commands are recognized.");
+	
+		int cnt = 0;
+		QString buf;
+		foreach(QString cmd, m_commands.keys()) {
+			if(buf.size()) {
 				buf += ' ';
+				while(buf.size() % 5 != 0)
+					buf += ' ';
+			}
+	
+			++cnt;
+			buf += cmd;
+			if(cnt >= 12) {
+				cnt = 0;
+				cmds.append(buf);
+				buf.clear();
+			}
 		}
-
-		++cnt;
-		buf += cmd;
-		if(cnt >= 12) {
-			cnt = 0;
+	
+		if(buf.size())
 			cmds.append(buf);
-			buf.clear();
-		}
+	
+		cmds.append("Help OK.");
 	}
-
-	if(buf.size())
-		cmds.append(buf);
-
-	cmds.append("Help OK.");
-
+	
 	sendLines(214, cmds);
 }
 
@@ -949,6 +994,18 @@ void neteK::FtpHandler::dataTransferStatus(bool ok)
 	process();
 }
 
+void neteK::FtpHandler::parseLine(QString line, QString &cmd, QString &args)
+{
+	int space = line.indexOf(' ');
+	if(space < 0) {
+		cmd = line.toUpper();
+	} else {
+		cmd = line.left(space).toUpper();
+		args = line.mid(space+1);
+	}
+}
+
+
 void neteK::FtpHandler::process()
 {
 	if(m_control && m_control->state() == QAbstractSocket::UnconnectedState) {
@@ -999,16 +1056,7 @@ void neteK::FtpHandler::process()
 
 	while(!m_control_channel_blocked && m_requests.size()) {
 		QString cmd, args;
-		{
-			QString line = m_requests.dequeue();
-			int space = line.indexOf(' ');
-			if(space == -1) {
-				cmd = line.toUpper();
-			} else {
-				cmd = line.left(space).toUpper();
-				args = line.mid(space+1);
-			}
-		}
+		parseLine(m_requests.dequeue(), cmd, args);
 
 		if(m_commands.contains(cmd)) {
 			const command &c = m_commands.value(cmd);

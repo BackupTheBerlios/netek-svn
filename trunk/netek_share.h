@@ -67,6 +67,7 @@ class Share: public QObject {
 		bool deleteFile(QString who, QString cwd, QString path) const;
 		bool createFolder(QString who, QString cwd, QString path) const;
 		bool deleteFolder(QString who, QString cwd, QString path) const;
+		QFile *changeAttributes(QString who, QString cwd, QString path) const;
 		
 		bool resolvePath(QString cwd, QString path, QString &resolved) const;
 

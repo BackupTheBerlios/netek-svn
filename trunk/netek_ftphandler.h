@@ -122,6 +122,7 @@ class FtpHandler: public QObject {
 	void command_SIZE(QString);
 	void command_MDTM(QString);
 	void command_EPSV(QString);
+	void command_SITE(QString);
 
 
 	QPointer<Share> m_share;
@@ -152,6 +153,7 @@ class FtpHandler: public QObject {
 	static QString month(int m);
 	QString me();
 	void logAction(QString what);
+	static void parseLine(QString line, QString &cmd, QString &args);
 	
 signals:
 	void processSignal();

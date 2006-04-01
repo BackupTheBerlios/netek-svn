@@ -355,6 +355,21 @@ bool neteK::Share::deleteFile(QString who, QString cwd, QString path) const
 	return ret;
 }
 
+QFile *neteK::Share::changeAttributes(QString who, QString cwd, QString path) const
+{
+	QPointer<QFile> ret;
+	if(!m_readonly && filesystemPathNotRoot(cwd, path, path)) {
+		ret = new QFile(path);
+		if(!ret->exists())
+			delete ret;
+	}
+		
+	if(ret)
+		logAction(who, tr("changing attributes of: %1").arg(path));
+		
+	return ret;
+}
+
 bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) const
 {
 	cwd.replace('\\', '/');
