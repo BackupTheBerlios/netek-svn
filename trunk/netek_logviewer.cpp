@@ -7,18 +7,25 @@
 neteK::LogViewer::LogViewer()
 {
 	ui.setupUi(this);
-	
+
+	{
+		QFont font = ui.logText->font();
+		font.setFamily("");
+		font.setStyleHint(QFont::TypeWriter); // TODO: check on linux
+		ui.logText->setFont(font);
+	}
+
 	Settings settings;
-	
+
 	ui.logKBytes->setValue(settings.logKBytes());
-	
+
 	connect(this, SIGNAL(scrollDownSignal()), SLOT(scrollDown()), Qt::QueuedConnection);
 	connect(Application::log(), SIGNAL(appendToLog(QString)), SLOT(log(QString)));
 	connect(ui.copyToClipboard, SIGNAL(clicked()), SLOT(copyToClipboard()));
 	connect(ui.saveToFile, SIGNAL(clicked()), SLOT(saveToFile()));
 	connect(ui.close, SIGNAL(clicked()), SLOT(reject()));
 	connect(ui.clearLog, SIGNAL(clicked()), SLOT(clearLog()));
-	
+
 	{
 		QRect geom = settings.logViewerGeometry();
 		if(geom.isValid()) {
@@ -26,7 +33,7 @@ neteK::LogViewer::LogViewer()
 			move(geom.topLeft());
 		}
 	}
-	
+
 	log(Application::log()->readLog());
 }
 
@@ -35,7 +42,7 @@ void neteK::LogViewer::reject()
 	Settings settings;
 	settings.setLogKBytes(ui.logKBytes->value());
 	settings.setLogViewerGeometry(QRect(pos(), size()));
-	
+
 	QDialog::reject();
 }
 
@@ -43,7 +50,7 @@ void neteK::LogViewer::log(QString data)
 {
 	QTextCursor(ui.logText->document()->rootFrame()->lastCursorPosition())
 		.insertText(data);
-	
+
 	if(ui.autoScroll->isChecked())
 		emit scrollDownSignal();
 }
@@ -68,7 +75,7 @@ void neteK::LogViewer::saveToFile()
 	if(QDialog::Accepted == dlg.exec()) {
 		QByteArray txt = ui.logText->toPlainText().toUtf8();
 		QFile f(dlg.selectedFiles().at(0));
-		if(!f.open(QIODevice::WriteOnly) || txt.size() != f.write(txt))
+		if(!f.open(QIODevice::WriteOnly | QIODevice::Text) || txt.size() != f.write(txt))
 			QMessageBox::critical(this, qApp->applicationName(), tr("Error saving file!"),
 				QMessageBox::Cancel, 0);
 	}

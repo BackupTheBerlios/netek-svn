@@ -7,7 +7,7 @@
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
 
-// TODO: DnD folders on win32
+// TODO: DnD folders on linux
 
 namespace neteK {
 
@@ -124,7 +124,7 @@ neteK::Gui::Gui()
 : m_save_geometry_timer(false)
 {
 	ui.setupUi(this);
-	
+
 	m_icon = makeTrayIcon(this);
 	if(m_icon) {
 		m_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater()));
@@ -242,7 +242,7 @@ void neteK::Gui::makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, i
 		new_a->setEnabled(!sh->runStatus());
 	else if(a == ui.actionStop)
 		new_a->setEnabled(sh->runStatus());
-		
+
 	connect(new_a, SIGNAL(triggered()), sm, SLOT(map()));
 }
 
@@ -253,29 +253,29 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 	menu.setDefaultAction(ui.action_FTP_shares);
 	menu.addSeparator();
 	menu.addAction(ui.action_Create_share);
-	
+
 	QPointer<QMenu> smenu = new QMenu(tr("&Shares"), &menu);
 	smenu->setIcon(QPixmap(":/icons/folder_open.png"));
 	menu.addMenu(smenu);
-	
+
 	{
 		QList<QPointer<QSignalMapper> > mappers;
 		for(int i=0; i<5; ++i)
 			mappers.append(new QSignalMapper(smenu));
-			
+
 		connect(mappers.at(0), SIGNAL(mapped(int)), SLOT(copyLinkMenu(int)));
 		connect(mappers.at(1), SIGNAL(mapped(int)), SLOT(shareSettings(int)));
 		connect(mappers.at(2), SIGNAL(mapped(int)), SLOT(startShare(int)));
 		connect(mappers.at(3), SIGNAL(mapped(int)), SLOT(stopShare(int)));
 		connect(mappers.at(4), SIGNAL(mapped(int)), SLOT(deleteShare(int)));
-			
+
 		for(int i=0; i<m_shares->shares(); ++i) {
 			QPointer<Share> sh = m_shares->share(i);
 			if(validAndConfigured(sh)) {
 				QPointer<QMenu> shmenu = new QMenu(sh->niceId(), smenu);
 				shmenu->setIcon(shareIcon(sh));
 				smenu->addMenu(shmenu);
-				
+
 				makeMappedShareAction(sh, shmenu, mappers.at(0), i, ui.actionCopy_link);
 				makeMappedShareAction(sh, shmenu, mappers.at(1), i, ui.actionSettings);
 				makeMappedShareAction(sh, shmenu, mappers.at(2), i, ui.actionStart);
@@ -284,7 +284,7 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 			}
 		}
 	}
-	
+
 	menu.addSeparator();
 	menu.addAction(ui.actionShow_log);
 	menu.addAction(ui.action_Global_settings);
@@ -369,34 +369,34 @@ QPixmap neteK::Gui::shareIcon(Share *sh)
 	}
 }
 
-bool neteK::Gui::getDragAndDropPath(QString text, QString &path)
+bool neteK::Gui::getDragAndDropPath(const QMimeData *mime, QString &path)
 {
-	{
-		QUrl url(text, QUrl::StrictMode);
-		if(url.isValid()) {
-			if(url.scheme().size() == 0)
-				;
-			else if(url.scheme() == "file")
-				text = url.path();
-			else
-				return false;
+	QString text = mime->text();
+
+	foreach(QUrl url, mime->urls()) {
+		QString lf = url.toLocalFile();
+		if(lf.size()) {
+			text = lf;
+			break;
 		}
 	}
-	
+
 	{
+		qDebug() << "DnD is file?" << text;
 		QFileInfo info(text);
 		if(info.isFile())
 			text = info.path();
 	}
-	
+
 	{
+		qDebug() << "DnD is directory?" << text;
 		QFileInfo info(text);
 		if(info.isDir()) {
 			path = info.canonicalFilePath();
-			return true;
+			return path.size();
 		}
 	}
-	
+
 	return false;
 }
 
@@ -404,10 +404,11 @@ void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)
 {
 	qDebug() << "DnD MIME:" << e->mimeData()->formats();
 	qDebug() << "DnD text:" << e->mimeData()->text();
-	
+	qDebug() << "DnD URLs:" << e->mimeData()->urls();
+
 	QString path;
-	if(getDragAndDropPath(e->mimeData()->text(), path)) {
-		e->setDropAction(Qt::LinkAction); // TODO: check this...
+	if(getDragAndDropPath(e->mimeData(), path)) {
+		e->setDropAction(Qt::LinkAction);
 		e->acceptProposedAction();
 	}
 }
@@ -415,8 +416,11 @@ void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)
 void neteK::Gui::dropEvent(QDropEvent *e)
 {
 	QString path;
-	if(getDragAndDropPath(e->mimeData()->text(), path))
+	if(getDragAndDropPath(e->mimeData(), path)) {
+		activateWindow();
+		raise();
 		m_shares->createShareWithSettings(path);
+	}
 }
 
 void neteK::Gui::sharesChanged()

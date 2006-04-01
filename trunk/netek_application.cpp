@@ -1,8 +1,6 @@
 #include "netek_application.h"
 #include "netek_settings.h"
 
-// TODO: proper app data...
-
 #ifdef Q_OS_UNIX
 static const char kde_autostart[] = ".kde/Autostart/netek";
 static const char gnome_autostart[] = ".config/autostart/netek.desktop";
@@ -29,7 +27,7 @@ neteK::Application::Application(int &argc, char **argv)
 	setApplicationName("neteK");
 	setWindowIcon(QIcon(":/icons/netek.png"));
 	setQuitOnLastWindowClosed(false);
-	
+
 	QDir::home().mkpath(app_data);
 
 #ifdef Q_OS_UNIX
@@ -100,30 +98,30 @@ void neteK::Log::logLine(QString line)
 {
 	if(line.size() == 0)
 		return;
-		
+
 	Settings settings;
-	
+
 	qint64 max = Settings().logKBytes() * 1024;
-	
+
 	QString txt = QString("%1 [%2] %3\n")
 		.arg(QDateTime::currentDateTime().toString(Qt::LocalDate))
 		.arg(Application::applicationVersion())
 		.arg(line);
-				
+
 	emit appendToLog(txt);
-	
+
 	QFile f(m_file);
 	if(max == 0)
 		f.remove();
 	else {
-		if(f.open(QIODevice::Append)) {
+		if(f.open(QIODevice::Append | QIODevice::Text)) {
 			f.write(txt.toUtf8());
-			f.close();		
+			f.close();
 		}
-		
+
 		if(f.size() > settings.logKBytes() * 3 / 2) {
 			QString log = readLog();
-			if(f.open(QIODevice::WriteOnly)) {
+			if(f.open(QIODevice::WriteOnly | QIODevice::Text)) {
 				f.write(log.toUtf8());
 				f.close();
 			}
@@ -134,14 +132,14 @@ void neteK::Log::logLine(QString line)
 QString neteK::Log::readLog()
 {
 	qint64 max = Settings().logKBytes() * 1024;
-	
+
 	QFile f(m_file);
-	if(f.open(QIODevice::ReadOnly)) {
+	if(f.open(QIODevice::ReadOnly | QIODevice::Text)) {
 		if(f.size() > max)
 			f.seek(f.size() - max);
 		return QString::fromUtf8(f.readAll());
 	}
-	
+
 	return QString();
 }
 

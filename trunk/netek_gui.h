@@ -13,32 +13,32 @@ class LogViewer;
 
 class Gui: public QMainWindow {
 	Q_OBJECT;
-	
+
 	Ui::Gui ui;
-	
+
 	QPointer<QObject> m_icon;
 	bool m_save_geometry_timer;
 	QPointer<Shares> m_shares;
 	QPointer<LogViewer> m_log_viewer;
-	
+
 	Share *getShare(int id = -1);
 	static QPixmap shareIcon(Share *sh);
 	static bool validAndConfigured(Share *sh);
 	void makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, int i, QAction *a);
-	static bool getDragAndDropPath(QString text, QString &path);
-	
+	static bool getDragAndDropPath(const QMimeData *mime, QString &path);
+
 public:
 	Gui();
-	
+
 	void closeEvent(QCloseEvent *);
 	void resizeEvent(QResizeEvent *);
 	void moveEvent(QMoveEvent *);
 	void dragEnterEvent(QDragEnterEvent *e);
 	void dropEvent(QDropEvent *e);
-	
+
 signals:
 	void quit();
-	
+
 public slots:
 	void toggleRunStatus();
 	void shareSettings(int id = -1);
