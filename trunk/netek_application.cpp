@@ -180,7 +180,7 @@ neteK::Application::Application(int &argc, char **argv)
 		QDir::home().mkpath(g_nautilus_scripts);
 		QFile s(QDir(QDir::home().filePath(g_nautilus_scripts)).filePath("Create share..."));
 		if(s.open(QIODevice::WriteOnly)) {
-			s.write(QString("#! /bin/sh\necho \"$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS\" | while read x; do %1 createShare \"$x\"; exit; done\n")
+			s.write(QString("#! /bin/sh\necho \"$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS\" | while read x; do (%1 createShare \"$x\" &); exit; done\n")
 					.arg(applicationFilePath()).toUtf8());
 			s.setPermissions(s.permissions() | QFile::ExeOwner | QFile::ExeGroup | QFile::ExeOther);
 		}
