@@ -1,3 +1,20 @@
+// This file is part of neteK project http://netek.berlios.de
+// Copyright (C) 2005-2006 Egon Kocjan <egon.kocjan@xlab.si>
+// 
+// This program is free software; you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation; either version 2 of the License, or
+// (at your option) any later version.
+// 
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+// 
+// You should have received a copy of the GNU General Public License
+// along with this program; if not, write to the Free Software
+// Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+
 #include "netek_gui.h"
 #include "netek_share.h"
 #include "netek_shares.h"
@@ -7,7 +24,7 @@
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
 
-// TODO: file manager integration
+// TODO: winexplorer integration
 
 namespace neteK {
 
@@ -451,25 +468,25 @@ void neteK::Gui::sharesChanged()
 					item->setText(2, "-");
 			}
 
-			QColor color;
 			QString status;
+			QColor status_color;
 			switch(sh->status()) {
 				case Share::StatusStarted:
 					status = tr("started");
-					color = QColor(0, 0x99, 0);
+					status_color = QColor(0, 0x99, 0);
 					break;
 				case Share::StatusStopped:
 					status = tr("stopped");
-					color = QColor(0x66, 0x66, 0x66);
+					status_color = QColor(0x66, 0x66, 0x66);
 					break;
 				default:
 					status = tr("processing");
-					color = QColor(0xff, 0x66, 0);
+					status_color = QColor(0xff, 0x66, 0);
 			}
 
 			item->setIcon(0, shareIcon(sh));
 			item->setText(3, status);
-			item->setTextColor(3, color);
+			item->setTextColor(3, status_color);
 			item->setText(4, QString::number(sh->clients()));
 		}
 	}
