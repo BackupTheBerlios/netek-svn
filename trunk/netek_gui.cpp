@@ -451,20 +451,25 @@ void neteK::Gui::sharesChanged()
 					item->setText(2, "-");
 			}
 
+			QColor color;
 			QString status;
 			switch(sh->status()) {
 				case Share::StatusStarted:
 					status = tr("started");
+					color = QColor(0, 0x99, 0);
 					break;
 				case Share::StatusStopped:
 					status = tr("stopped");
+					color = QColor(0x66, 0x66, 0x66);
 					break;
 				default:
 					status = tr("processing");
+					color = QColor(0xff, 0x66, 0);
 			}
 
 			item->setIcon(0, shareIcon(sh));
 			item->setText(3, status);
+			item->setTextColor(3, color);
 			item->setText(4, QString::number(sh->clients()));
 		}
 	}
