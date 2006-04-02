@@ -1,0 +1,8 @@
+[Desktop Entry]
+ServiceTypes=all/all
+Actions=createShare;
+
+[Desktop Action createShare]
+Name=Create share with neteK
+Icon=netek
+Exec=netek createShare %f
