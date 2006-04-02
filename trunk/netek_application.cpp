@@ -8,9 +8,9 @@
 #include <sys/un.h>
 #include <sys/ioctl.h>
 #include <errno.h>
-
 static const char g_kde_autostart[] = ".kde/Autostart/netek";
 static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
+static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK";
 static const char g_app_data[] = ".netek";
 #endif
 
@@ -174,6 +174,16 @@ neteK::Application::Application(int &argc, char **argv)
 			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1\n")
 					.arg(applicationFilePath()).toUtf8());
 
+	}
+
+	{
+		QDir::home().mkpath(g_nautilus_scripts);
+		QFile s(QDir(QDir::home().filePath(g_nautilus_scripts)).filePath("Create share..."));
+		if(s.open(QIODevice::WriteOnly)) {
+			s.write(QString("#! /bin/sh\necho \"$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS\" | while read x; do %1 createShare \"$x\"; exit; done\n")
+					.arg(applicationFilePath()).toUtf8());
+			s.setPermissions(s.permissions() | QFile::ExeOwner | QFile::ExeGroup | QFile::ExeOther);
+		}
 	}
 #endif
 
