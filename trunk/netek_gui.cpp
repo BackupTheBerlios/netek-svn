@@ -383,25 +383,9 @@ bool neteK::Gui::getDragAndDropPath(const QMimeData *mime, QString &path)
 	files.append(QUrl(mime->text(), QUrl::StrictMode).toLocalFile());
 	files.append(mime->text());
 
-	foreach(QString file, files) {
-		if(file.size() == 0)
-			continue;
-			
-		qDebug() << "DnD is file?" << file;
-		QFileInfo info1(file);
-		if(info1.isFile())
-			file = info1.path();
-		
-		qDebug() << "DnD is directory?" << file;
-		QFileInfo info2(file);
-		if(info2.isDir()) {
-			path = info2.canonicalFilePath();
-			if(path.size()) {
-				qDebug() << "Resolved:" << path;
-				return true;
-			}
-		}
-	}
+	foreach(QString file, files)
+		if(Shares::resolvePathForShare(file, path))
+			return true;
 
 	return false;
 }
@@ -418,11 +402,8 @@ void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)
 void neteK::Gui::dropEvent(QDropEvent *e)
 {
 	QString path;
-	if(getDragAndDropPath(e->mimeData(), path)) {
-		activateWindow();
-		raise();
+	if(getDragAndDropPath(e->mimeData(), path))
 		m_shares->createShareWithSettings(path);
-	}
 }
 
 void neteK::Gui::sharesChanged()

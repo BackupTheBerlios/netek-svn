@@ -4,6 +4,8 @@
 
 neteK::Shares::Shares()
 {
+	connect(qApp, SIGNAL(command_createShare(QString)), SLOT(createShareResolvePath(QString)));
+	
 	Settings settings;
 	int shares = settings.beginReadArray("shares");
 	for(int i=0; i<shares; ++i) {
@@ -108,4 +110,36 @@ void neteK::Shares::settingsChanged()
 int neteK::Shares::shares() const
 {
 	return m_shares.size();
+}
+
+bool neteK::Shares::resolvePathForShare(QString file, QString &path)
+{
+	if(file.size() == 0)
+		return false;
+		
+	qDebug() << "resolvePathForShare is file?" << file;
+	QFileInfo info1(file);
+	if(info1.isFile())
+		file = info1.path();
+	
+	qDebug() << "resolvePathForShare is directory?" << file;
+	QFileInfo info2(file);
+	if(info2.isDir()) {
+		file = info2.canonicalFilePath();
+		if(file.size()) {
+			path = file;
+			qDebug() << "Resolved:" << path;
+			return true;
+		}
+	}
+	
+	return false;
+}
+
+int neteK::Shares::createShareResolvePath(QString path)
+{
+	return
+		resolvePathForShare(path, path)
+			? createShareWithSettings(path)
+			: -1;
 }

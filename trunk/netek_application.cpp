@@ -1,21 +1,136 @@
 #include "netek_application.h"
 #include "netek_settings.h"
+#include "netek_netutils.h"
 
 #ifdef Q_OS_UNIX
-static const char kde_autostart[] = ".kde/Autostart/netek";
-static const char gnome_autostart[] = ".config/autostart/netek.desktop";
-static const char app_data[] = ".netek";
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/ioctl.h>
+#include <errno.h>
+
+static const char g_kde_autostart[] = ".kde/Autostart/netek";
+static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
+static const char g_app_data[] = ".netek";
 #endif
 
 #ifdef Q_OS_WIN32
 #include <windows.h>
-static const wchar_t regkey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-static const wchar_t subkey[] = L"netek";
-static const char app_data[] = "Application Data/netek";
+static const wchar_t g_regkey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+static const wchar_t g_subkey[] = L"netek";
+static const char g_app_data[] = "Application Data/netek";
 #endif
 
+namespace neteK {
+
+// TODO: IPC win32
+
+#ifdef Q_OS_UNIX
+class IPC: public QObject {
+	Q_OBJECT;
+	
+	static bool init(bool server, int &sock)
+	{
+		sockaddr_un addr;
+		socklen_t addr_len;
+
+		QByteArray path = Application::applicationData().filePath("cmd").toUtf8();
+		size_t psize = qMin((size_t)path.size(), sizeof(addr.sun_path));
+		
+		memset(&addr, 0, sizeof(addr));
+		addr.sun_family = AF_UNIX;
+		memcpy(addr.sun_path, path.data(), psize);
+		
+		addr_len = sizeof(addr) - sizeof(addr.sun_path) + psize;
+		
+		int nblk = 1;
+		
+		return -1 != (sock = ::socket(PF_UNIX, SOCK_STREAM, 0))
+			&& (server
+				? 0 == ::ioctl(sock, FIONBIO, &nblk)
+					&& 0 == ::unlink(path.data())
+					&& 0 == ::bind(sock, (sockaddr*)&addr, addr_len)
+					&& 0 == ::listen(sock, 20)
+				: 0 == ::connect(sock, (sockaddr*)&addr, addr_len));
+	}
+	
+	int m_sock;
+	
+signals:
+	void commandReceived(QStringList args);
+	
+private slots:
+	void accept(int)
+	{
+		int sock = ::accept(m_sock, 0, 0);
+		if(sock != -1) {
+			qDebug() << "IPC client connected";
+			QByteArray in;
+			for(;;) {
+				char buf[networkBufferSize];
+				ssize_t read = ::read(sock, buf, sizeof(buf));
+				if(read <= 0) {
+					if(read == 0) {
+						QDataStream data(&in, QIODevice::ReadOnly);
+						QStringList args;
+						data >> args;
+						emit commandReceived(args);
+					} else
+						qDebug() << "IPC read error:" << strerror(errno);
+					break;
+				} else
+					in.append(QByteArray(buf, read));
+			}
+			
+			::close(sock);
+		}
+	}
+	
+public:
+	IPC()
+	: m_sock(-1)
+	{
+		if(init(true, m_sock)) {
+			QPointer<QSocketNotifier> n = new QSocketNotifier(m_sock, QSocketNotifier::Read, this);
+			connect(n, SIGNAL(activated(int)), SLOT(accept(int)));
+			n->setEnabled(true);
+		} else {
+			qDebug() << "IPC server failed to start:" << strerror(errno);
+			deleteLater();
+		}
+	}
+	
+	~IPC()
+	{
+		if(m_sock != -1)
+			::close(m_sock);
+	}
+	
+	static bool sendCommand(QStringList args)
+	{
+		bool ret = false;
+		
+		int sock;
+		if(init(false, sock)) {
+			QByteArray out;
+			QDataStream data(&out, QIODevice::WriteOnly);
+			data << args;
+			
+			ret = out.size() == ::write(sock, out.data(), out.size());
+		}
+		
+		if(sock != -1 && ::close(sock) != 0)
+			ret = false;
+		
+		return ret;
+	}
+};
+#endif
+
+}
+
 QDir neteK::Application::applicationData()
-{ return QDir(QDir::home().absoluteFilePath(app_data)); }
+{ return QDir(QDir::home().absoluteFilePath(g_app_data)); }
 
 QString neteK::Application::applicationVersion()
 { return "0.8.1"; }
@@ -25,22 +140,36 @@ neteK::Application::Application(int &argc, char **argv)
 {
 	setOrganizationName("neteK");
 	setApplicationName("neteK");
+
+	connect(this, SIGNAL(processCommandsSignal()), SLOT(processCommandsSlot()), Qt::QueuedConnection);
+	
+	QDir::home().mkpath(g_app_data);
+	
+	{
+		QStringList args = arguments();
+		if(args.size() >= 2) {
+			args.pop_front();
+			if(IPC::sendCommand(args))
+				::exit(0);
+			else
+				processCommand(args);
+		}
+	}
+	
 	setWindowIcon(QIcon(":/icons/netek.png"));
 	setQuitOnLastWindowClosed(false);
-
-	QDir::home().mkpath(app_data);
 
 #ifdef Q_OS_UNIX
 	setStyle(new QPlastiqueStyle);
 
 	{
-		QString path = QDir::home().filePath(kde_autostart);
+		QString path = QDir::home().filePath(g_kde_autostart);
 		QFile(path).remove();
 		QFile(applicationFilePath()).link(path);
 	}
 
 	{
-		QFile dfile(QDir::home().filePath(gnome_autostart));
+		QFile dfile(QDir::home().filePath(g_gnome_autostart));
 		if(dfile.open(QIODevice::WriteOnly))
 			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1\n")
 					.arg(applicationFilePath()).toUtf8());
@@ -56,13 +185,43 @@ neteK::Application::Application(int &argc, char **argv)
 		RegCloseKey(key);
 	}
 #endif
+
+	{
+		QPointer<IPC> ipc = new IPC;
+		ipc->setParent(this);
+		connect(ipc, SIGNAL(commandReceived(QStringList)), SLOT(processCommand(QStringList)));
+	}
+}
+
+void neteK::Application::processCommand(QStringList cmd)
+{
+	m_commands.append(cmd);
+	emit processCommandsSignal();
+}
+
+void neteK::Application::processCommandsSlot()
+{
+	while(m_commands.size()) {
+		QStringList args = m_commands.front();
+		m_commands.pop_front();
+
+		qDebug() << "Processing command:" << args;
+		
+		if(args.size() == 0)
+			continue;
+			
+		QString cmd = args.front();
+		
+		if(cmd == "createShare" && args.size() >= 2)
+			emit command_createShare(args.at(1));
+	}
 }
 
 void neteK::Application::userQuit()
 {
 #ifdef Q_OS_UNIX
-	QFile(QDir::home().filePath(kde_autostart)).remove();
-	QFile(QDir::home().filePath(gnome_autostart)).remove();
+	QFile(QDir::home().filePath(g_kde_autostart)).remove();
+	QFile(QDir::home().filePath(g_gnome_autostart)).remove();
 #endif
 
 #ifdef Q_OS_WIN32
@@ -153,3 +312,5 @@ neteK::ObjectLog::~ObjectLog()
 {
 	Application::log()->logLine(m_stop);
 }
+
+#include "netek_application.moc"

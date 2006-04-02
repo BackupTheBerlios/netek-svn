@@ -35,6 +35,7 @@ class Application: public QApplication {
 	Q_OBJECT;
 	
 	static Log *g_log;
+	QList<QStringList> m_commands;
 	
 public:
 	Application(int &argc, char **argv);
@@ -44,8 +45,17 @@ public:
 	static QDir applicationData();
 	static QString applicationVersion();
 	
+signals:
+	void command_createShare(QString file);
+	
+	void processCommandsSignal();
+	
+private slots:
+	void processCommandsSlot();
+	
 public slots:
 	void userQuit();
+	void processCommand(QStringList args);
 };
 
 }
