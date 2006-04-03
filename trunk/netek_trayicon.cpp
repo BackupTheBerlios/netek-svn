@@ -20,20 +20,20 @@
 // TODO: transparent X11 icon
 // TODO: blinking indicator
 
-#ifdef Q_OS_UNIX
+#ifdef Q_WS_X11
 #include <QX11Info>
 #include <X11/Xlib.h>
 #define SYSTEM_TRAY_REQUEST_DOCK    0
 #define XEMBED_EMBEDDED_NOTIFY		0
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_WS_WIN
 #include <windows.h>
 #endif
 
 namespace neteK {
 
-#ifdef Q_OS_UNIX
+#ifdef Q_WS_X11
 class TrapErrorsX11 {
 	static bool error, already;
 	static int (*handler)(Display *, XErrorEvent *);
@@ -187,7 +187,7 @@ public slots:
 };
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_WS_WIN
 class TrayIconWin32: public QWidget {
     Q_OBJECT;
 
@@ -263,9 +263,9 @@ signals:
 
 QObject *neteK::makeTrayIcon(QMainWindow *owner)
 {
-#if defined(Q_OS_UNIX)
+#if defined(Q_WS_X11)
 	return new TrayIconX11(owner);
-#elif defined(Q_OS_WIN32)
+#elif defined(Q_WS_WIN)
     return TrayIconWin32::make();
 #else
 	return 0;

@@ -27,7 +27,7 @@ neteK::LogViewer::LogViewer()
 
 	{
 		QFont font = ui.logText->font();
-#ifdef Q_OS_UNIX
+#ifdef Q_WS_X11
 		font.setFamily("Monospace");
 #else
 		font.setFamily("");

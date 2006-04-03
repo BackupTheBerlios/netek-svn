@@ -24,11 +24,15 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/ioctl.h>
-#include <errno.h>
+#include <cerrno>
+static const char g_app_data[] = ".netek";
+#endif
+
+#ifdef Q_WS_X11
+#include <QX11Info>
 static const char g_kde_autostart[] = ".kde/Autostart/netek";
 static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
 static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK";
-static const char g_app_data[] = ".netek";
 #endif
 
 #ifdef Q_OS_WIN32
@@ -176,7 +180,7 @@ neteK::Application::Application(int &argc, char **argv)
 	setWindowIcon(QIcon(":/icons/netek.png"));
 	setQuitOnLastWindowClosed(false);
 
-#ifdef Q_OS_UNIX
+#ifdef Q_WS_X11
 	setStyle(new QPlastiqueStyle);
 
 	{
@@ -228,6 +232,13 @@ void neteK::Application::processCommand(QStringList cmd)
 
 void neteK::Application::processCommandsSlot()
 {
+#ifdef Q_WS_X11
+	// This will hopefully disable X11 WMs' focus stealing prevention.
+	// We are opening dialogs over IPC, so WM can't relate user actions.
+	QX11Info::setAppTime(0);
+	QX11Info::setAppUserTime(0);
+#endif
+
 	while(m_commands.size()) {
 		QStringList args = m_commands.front();
 		m_commands.pop_front();
@@ -246,7 +257,7 @@ void neteK::Application::processCommandsSlot()
 
 void neteK::Application::userQuit()
 {
-#ifdef Q_OS_UNIX
+#ifdef Q_WS_X11
 	QFile(QDir::home().filePath(g_kde_autostart)).remove();
 	QFile(QDir::home().filePath(g_gnome_autostart)).remove();
 #endif

@@ -21,7 +21,6 @@
 
 neteK::Shares::Shares()
 {
-	// TODO: this does not work very well on GNOME, window opens under nautilus...
 	connect(qApp, SIGNAL(command_createShare(QString)), SLOT(createShareResolvePath(QString)));
 	
 	Settings settings;
