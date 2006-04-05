@@ -22,6 +22,7 @@
 #include "netek_application.h"
 
 // TODO: no space left on disk test
+// TODO: handle error() stuff with duplicate connect
 
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
