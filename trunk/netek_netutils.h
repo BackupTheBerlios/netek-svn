@@ -23,7 +23,7 @@
 
 namespace neteK {
 
-	const int networkBufferSize = 8192;
+	const int networkBufferSize = 65536;
 
 	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
 
