@@ -15,24 +15,20 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-#ifndef __NETEK_TRAYICON_H__
-#define __NETEK_TRAYICON_H__
+#ifndef __NETEK_ABOUT_H__
+#define __NETEK_ABOUT_H__
 
-#include <QtGui>
+#include "ui_netek_about.h"
 
 namespace neteK {
 
-class TrayIcon: public QWidget {
-		Q_OBJECT;
-		
-	signals:
-		void activated();
-		void showMenu(const QPoint &pos);
+class About: public QDialog {
+	Q_OBJECT;
 	
-	public:		
-		static TrayIcon *make(QMainWindow *owner);
-		
-		virtual void setActive(bool yes) = 0;
+	Ui::About ui;
+	
+	public:
+		About();
 };
 
 }

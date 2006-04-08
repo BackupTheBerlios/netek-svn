@@ -21,7 +21,7 @@
 #include "netek_netutils.h"
 #include "netek_application.h"
 
-// TODO: no space left on disk test
+// TODO: fix slow/unreliable behaviour
 // TODO: handle error() stuff with duplicate connect
 
 neteK::FtpHandlerData::FtpHandlerData()

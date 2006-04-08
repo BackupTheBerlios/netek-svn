@@ -16,7 +16,7 @@
    <bool>true</bool>
   </property>
   <property name="windowTitle" >
-   <string>FTP shares - neteK</string>
+   <string>neteK</string>
   </property>
   <widget class="QWidget" name="centralWidget" >
    <layout class="QVBoxLayout" >
@@ -70,12 +70,6 @@
    <property name="orientation" >
     <enum>Qt::Horizontal</enum>
    </property>
-   <property name="iconSize" >
-    <size>
-     <width>32</width>
-     <height>32</height>
-    </size>
-   </property>
    <property name="toolButtonStyle" >
     <enum>Qt::ToolButtonTextUnderIcon</enum>
    </property>
@@ -87,6 +81,7 @@
    <addaction name="actionSettings" />
    <addaction name="actionStart" />
    <addaction name="actionStop" />
+   <addaction name="actionStop_all" />
    <addaction name="actionCopy_link" />
   </widget>
   <widget class="QMenuBar" name="menuBar" >
@@ -98,6 +93,17 @@
      <height>33</height>
     </rect>
    </property>
+   <widget class="QMenu" name="menu_File" >
+    <property name="title" >
+     <string>&amp;Actions</string>
+    </property>
+    <addaction name="actionShow_log" />
+    <addaction name="action_Global_settings" />
+    <addaction name="separator" />
+    <addaction name="action_About" />
+    <addaction name="separator" />
+    <addaction name="action_Quit" />
+   </widget>
    <widget class="QMenu" name="menu_Share" >
     <property name="title" >
      <string>&amp;Share</string>
@@ -107,23 +113,15 @@
     <addaction name="actionSettings" />
     <addaction name="actionStart" />
     <addaction name="actionStop" />
+    <addaction name="actionStop_all" />
     <addaction name="actionCopy_link" />
-   </widget>
-   <widget class="QMenu" name="menu_File" >
-    <property name="title" >
-     <string>&amp;Actions</string>
-    </property>
-    <addaction name="actionShow_log" />
-    <addaction name="action_Global_settings" />
-    <addaction name="separator" />
-    <addaction name="action_Quit" />
    </widget>
    <addaction name="menu_File" />
    <addaction name="menu_Share" />
   </widget>
   <action name="actionDelete" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/remove.png</iconset>
+    <iconset resource="icons.qrc" >:/icons/button_cancel.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Delete</string>
@@ -180,12 +178,12 @@
     <string>&amp;Create share</string>
    </property>
   </action>
-  <action name="action_FTP_shares" >
+  <action name="actionNetek" >
    <property name="icon" >
     <iconset resource="icons.qrc" >:/icons/netek.png</iconset>
    </property>
    <property name="text" >
-    <string>&amp;FTP shares</string>
+    <string>&amp;neteK</string>
    </property>
   </action>
   <action name="action_Create" >
@@ -210,6 +208,22 @@
    </property>
    <property name="text" >
     <string>Show &amp;log</string>
+   </property>
+  </action>
+  <action name="action_About" >
+   <property name="icon" >
+    <iconset resource="icons.qrc" >:/icons/netek.png</iconset>
+   </property>
+   <property name="text" >
+    <string>&amp;About neteK</string>
+   </property>
+  </action>
+  <action name="actionStop_all" >
+   <property name="icon" >
+    <iconset>icons/stop.png</iconset>
+   </property>
+   <property name="text" >
+    <string>Stop &amp;all</string>
    </property>
   </action>
  </widget>

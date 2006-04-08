@@ -25,6 +25,7 @@ make
 %install
 rm -fr %{buildroot}
 install -s -m 755 -D netek %{buildroot}/usr/bin/netek
+install -m 644 -D COPYING %{buildroot}/usr/share/doc/netek/COPYING
 install -m 644 -D netek.desktop %{buildroot}/usr/share/applications/netek.desktop
 install -m 644 -D icons/netek.png %{buildroot}/usr/share/pixmaps/netek.png
 install -m 644 -D netek_konqueror.desktop %{buildroot}/opt/kde3/share/apps/konqueror/servicemenus/netek_konqueror.desktop

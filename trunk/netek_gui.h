@@ -27,13 +27,14 @@ namespace neteK {
 class Share;
 class Shares;
 class LogViewer;
+class TrayIcon;
 
 class Gui: public QMainWindow {
 	Q_OBJECT;
 
 	Ui::Gui ui;
 
-	QPointer<QObject> m_icon;
+	QPointer<TrayIcon> m_tray_icon;
 	bool m_save_geometry_timer;
 	QPointer<Shares> m_shares;
 	QPointer<LogViewer> m_log_viewer;
@@ -62,6 +63,7 @@ public slots:
 	void deleteShare(int id = -1);
 	void startShare(int id = -1);
 	void stopShare(int id = -1);
+	void stopAllShares();
 	void sharesChanged();
 	void globalSettings();
 	void toggleVisible();
@@ -71,6 +73,7 @@ public slots:
 	void shareMenu();
 	void copyLinkMenu(int id = -1);
 	void showLog();
+	void showAbout();
 };
 
 }

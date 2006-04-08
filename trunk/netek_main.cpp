@@ -34,6 +34,20 @@ int main(int argc, char *argv[])
 	);
 
 	neteK::Application app(argc, argv);
+	
+	{
+		QStringList broken;
+		// see Qt bug 105055
+		broken.append("4.1.1");
+		broken.append("4.1.2");
+		
+		if(broken.contains(qVersion()))
+			QMessageBox::warning(0, qApp->applicationName(),
+				QObject::tr("Your version of Qt has a bug, which is known to break this application.\nBad Qt versions: %1.")
+					.arg(broken.join(", ")),
+				QMessageBox::Ok, QMessageBox::NoButton);
+				    
+	}
 
 	neteK::Gui gui;
 

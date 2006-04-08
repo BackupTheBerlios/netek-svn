@@ -3,6 +3,8 @@ Outfile "netek-0.8.1.exe"
 XPStyle on
 InstallDir "$PROGRAMFILES\netek"
 
+TODO COPYING.txt
+
 Function uninstall
 	ReadRegStr $0 HKLM "Software\neteK" "uninstaller"
 	IfFileExists $0 0 continue

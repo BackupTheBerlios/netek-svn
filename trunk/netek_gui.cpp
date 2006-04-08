@@ -23,6 +23,7 @@
 #include "netek_settings.h"
 #include "netek_netutils.h"
 #include "netek_logviewer.h"
+#include "netek_about.h"
 
 // TODO: winexplorer integration
 
@@ -142,11 +143,11 @@ neteK::Gui::Gui()
 {
 	ui.setupUi(this);
 
-	m_icon = makeTrayIcon(this);
-	if(m_icon) {
-		m_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater()));
-		connect(m_icon, SIGNAL(activated()), SLOT(toggleVisible()));
-		connect(m_icon, SIGNAL(showMenu(const QPoint &)), SLOT(trayMenu(const QPoint &)));
+	m_tray_icon = TrayIcon::make(this);
+	if(m_tray_icon) {
+		m_tray_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater())); // TODO: fix this connect
+		connect(m_tray_icon, SIGNAL(activated()), SLOT(toggleVisible()));
+		connect(m_tray_icon, SIGNAL(showMenu(const QPoint &)), SLOT(trayMenu(const QPoint &)));
 	}
 
 	m_shares = new Shares;
@@ -161,17 +162,19 @@ neteK::Gui::Gui()
 	connect(ui.shareList, SIGNAL(currentItemChanged(QTreeWidgetItem *,QTreeWidgetItem *)), SLOT(sharesChanged()), Qt::QueuedConnection);
 	connect(ui.shareList, SIGNAL(itemActivated(QTreeWidgetItem *, int)), SLOT(toggleRunStatus()));
 
-	connect(ui.action_FTP_shares, SIGNAL(triggered()), SLOT(toggleVisible()));
+	connect(ui.actionNetek, SIGNAL(triggered()), SLOT(toggleVisible()));
 	connect(ui.action_Create_share, SIGNAL(triggered()), m_shares, SLOT(createShareWithSettings()));
 	connect(ui.action_Create, SIGNAL(triggered()), m_shares, SLOT(createShareWithSettings()));
 	connect(ui.actionSettings, SIGNAL(triggered()), SLOT(shareSettings()));
 	connect(ui.actionStart, SIGNAL(triggered()), SLOT(startShare()));
 	connect(ui.actionStop, SIGNAL(triggered()), SLOT(stopShare()));
+	connect(ui.actionStop_all, SIGNAL(triggered()), SLOT(stopAllShares()));
 	connect(ui.actionDelete, SIGNAL(triggered()), SLOT(deleteShare()));
 	connect(ui.action_Global_settings, SIGNAL(triggered()), SLOT(globalSettings()));
 	connect(ui.action_Quit, SIGNAL(triggered()), SIGNAL(quit()));
 	connect(ui.actionCopy_link, SIGNAL(triggered()), SLOT(copyLinkMenu()));
 	connect(ui.actionShow_log, SIGNAL(triggered()), SLOT(showLog()));
+	connect(ui.action_About, SIGNAL(triggered()), SLOT(showAbout()));
 
 	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
 
@@ -197,13 +200,13 @@ neteK::Gui::Gui()
 		connect(h, SIGNAL(sectionResized(int,int,int)), SLOT(saveGeometryTimer()));
 	}
 
-	if(!m_icon)
+	if(!m_tray_icon)
 		show();
 }
 
 void neteK::Gui::closeEvent(QCloseEvent *e)
 {
-	if(m_icon) {
+	if(m_tray_icon) {
 		hide();
 		e->ignore();
 	} else
@@ -266,8 +269,8 @@ void neteK::Gui::makeMappedShareAction(Share *sh, QMenu *m, QSignalMapper *sm, i
 void neteK::Gui::trayMenu(const QPoint &pos)
 {
 	QMenu menu(qApp->applicationName());
-	menu.addAction(ui.action_FTP_shares);
-	menu.setDefaultAction(ui.action_FTP_shares);
+	menu.addAction(ui.actionNetek);
+	menu.setDefaultAction(ui.actionNetek);
 	menu.addSeparator();
 	menu.addAction(ui.action_Create_share);
 
@@ -301,7 +304,8 @@ void neteK::Gui::trayMenu(const QPoint &pos)
 			}
 		}
 	}
-
+	
+	menu.addAction(ui.actionStop_all);
 	menu.addSeparator();
 	menu.addAction(ui.actionShow_log);
 	menu.addAction(ui.action_Global_settings);
@@ -320,6 +324,7 @@ void neteK::Gui::shareMenu()
 		menu.addAction(ui.actionSettings);
 		menu.addAction(ui.actionStart);
 		menu.addAction(ui.actionStop);
+		menu.addAction(ui.actionStop_all);
 		menu.addAction(ui.actionDelete);
 
 		menu.exec(QCursor::pos());
@@ -361,6 +366,12 @@ void neteK::Gui::stopShare(int id)
 	QPointer<Share> sh = getShare(id);
 	if(sh)
 		sh->stop();
+}
+
+void neteK::Gui::stopAllShares()
+{
+	for(int i=0; i<m_shares->shares(); ++i)
+		m_shares->share(i)->stop();
 }
 
 void neteK::Gui::toggleRunStatus()
@@ -428,6 +439,8 @@ void neteK::Gui::sharesChanged()
 	while(ui.shareList->topLevelItemCount() > m_shares->shares())
 		delete ui.shareList->takeTopLevelItem(ui.shareList->topLevelItemCount()-1);
 
+	bool is_active = false;
+	
 	for(int i=0; i<m_shares->shares(); ++i) {
 		QPointer<Share> sh = m_shares->share(i);
 		if(sh) {
@@ -474,6 +487,7 @@ void neteK::Gui::sharesChanged()
 				case Share::StatusStarted:
 					status = tr("started");
 					status_color = QColor(0, 0x99, 0);
+					is_active = true;
 					break;
 				case Share::StatusStopped:
 					status = tr("stopped");
@@ -490,7 +504,12 @@ void neteK::Gui::sharesChanged()
 			item->setText(4, QString::number(sh->clients()));
 		}
 	}
+	
+	if(m_tray_icon)
+		m_tray_icon->setActive(is_active);
 
+	ui.actionStop_all->setEnabled(is_active);
+	
 	{
 		QPointer<Share> sh = getShare();
 		bool ok = validAndConfigured(sh);
@@ -524,6 +543,11 @@ void neteK::Gui::showLog()
 		m_log_viewer->setAttribute(Qt::WA_DeleteOnClose);
 		m_log_viewer->show();
 	}
+}
+
+void neteK::Gui::showAbout()
+{
+	About().exec();
 }
 
 #include "netek_gui.moc"

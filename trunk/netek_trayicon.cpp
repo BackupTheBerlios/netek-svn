@@ -66,11 +66,12 @@ bool TrapErrorsX11::error;
 bool TrapErrorsX11::already = false;
 int (*TrapErrorsX11::handler)(Display *, XErrorEvent *) = 0;
 
-class TrayIconX11: public QWidget {
+class TrayIconX11: public TrayIcon {
 	Q_OBJECT;
 
 	QPointer<QMainWindow> m_owner;
-	QPixmap m_icon;
+	QPixmap m_icon_active, m_icon_inactive;
+	bool m_active;
 	bool m_docked;
 	//Atom m_xembed;
 
@@ -80,7 +81,9 @@ signals:
 
 public:
 	TrayIconX11(QMainWindow *owner)
-	: m_owner(owner), m_icon(QPixmap(":/icons/netek.png")), m_docked(false)
+	: m_owner(owner), m_icon_active(QPixmap(":/icons/netek.png")),
+		m_icon_inactive(QPixmap(":/icons/netek_grey.png")),
+		m_active(false), m_docked(false)
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setWindowTitle(qApp->applicationName());
@@ -108,7 +111,7 @@ public:
 	{
 		QPainter p(this);
 		p.setRenderHint(QPainter::SmoothPixmapTransform);
-		p.drawPixmap(rect(), m_icon);
+		p.drawPixmap(rect(), m_active ? m_icon_active : m_icon_inactive);
 	}
 
 	void mouseReleaseEvent(QMouseEvent *e)
@@ -137,6 +140,12 @@ public:
 		}
 
 		return QWidget::x11Event(e);
+	}
+	
+	void setActive(bool yes)
+	{
+		m_active = yes;
+		update();
 	}
 
 public slots:
@@ -261,7 +270,7 @@ signals:
 
 }
 
-QObject *neteK::makeTrayIcon(QMainWindow *owner)
+neteK::TrayIcon *neteK::TrayIcon::make(QMainWindow *owner)
 {
 #if defined(Q_WS_X11)
 	return new TrayIconX11(owner);

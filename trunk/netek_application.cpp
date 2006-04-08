@@ -32,7 +32,7 @@ static const char g_app_data[] = ".netek";
 #include <QX11Info>
 static const char g_kde_autostart[] = ".kde/Autostart/netek";
 static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
-static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK";
+static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK"; // TODO: some better way of integrating with nautilus?
 #endif
 
 #ifdef Q_OS_WIN32
@@ -178,10 +178,9 @@ neteK::Application::Application(int &argc, char **argv)
 	}
 	
 	setWindowIcon(QIcon(":/icons/netek.png"));
-	setQuitOnLastWindowClosed(false);
 
 #ifdef Q_WS_X11
-	setStyle(new QPlastiqueStyle);
+	setStyle(new QPlastiqueStyle); // TODO: color is sometimes b0rked under GNOME
 
 	{
 		QString path = QDir::home().filePath(g_kde_autostart);
