@@ -55,7 +55,7 @@ public:
 	void dropEvent(QDropEvent *e);
 
 signals:
-	void quit();
+	void userQuit();
 
 public slots:
 	void toggleRunStatus();
@@ -74,6 +74,7 @@ public slots:
 	void copyLinkMenu(int id = -1);
 	void showLog();
 	void showAbout();
+	void quitRequest();
 };
 
 }

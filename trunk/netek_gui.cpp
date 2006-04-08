@@ -145,7 +145,6 @@ neteK::Gui::Gui()
 
 	m_tray_icon = TrayIcon::make(this);
 	if(m_tray_icon) {
-		m_tray_icon->connect(this, SIGNAL(quit()), SLOT(deleteLater())); // TODO: fix this connect
 		connect(m_tray_icon, SIGNAL(activated()), SLOT(toggleVisible()));
 		connect(m_tray_icon, SIGNAL(showMenu(const QPoint &)), SLOT(trayMenu(const QPoint &)));
 	}
@@ -171,12 +170,12 @@ neteK::Gui::Gui()
 	connect(ui.actionStop_all, SIGNAL(triggered()), SLOT(stopAllShares()));
 	connect(ui.actionDelete, SIGNAL(triggered()), SLOT(deleteShare()));
 	connect(ui.action_Global_settings, SIGNAL(triggered()), SLOT(globalSettings()));
-	connect(ui.action_Quit, SIGNAL(triggered()), SIGNAL(quit()));
+	connect(ui.action_Quit, SIGNAL(triggered()), SLOT(quitRequest()));
 	connect(ui.actionCopy_link, SIGNAL(triggered()), SLOT(copyLinkMenu()));
 	connect(ui.actionShow_log, SIGNAL(triggered()), SLOT(showLog()));
 	connect(ui.action_About, SIGNAL(triggered()), SLOT(showAbout()));
 
-	connect(this, SIGNAL(quit()), qApp, SLOT(userQuit()));
+	connect(this, SIGNAL(userQuit()), qApp, SLOT(userQuit()), Qt::QueuedConnection);
 
 	sharesChanged();
 
@@ -210,7 +209,7 @@ void neteK::Gui::closeEvent(QCloseEvent *e)
 		hide();
 		e->ignore();
 	} else
-		emit quit();
+		emit userQuit();
 }
 
 void neteK::Gui::resizeEvent(QResizeEvent *)
@@ -548,6 +547,14 @@ void neteK::Gui::showLog()
 void neteK::Gui::showAbout()
 {
 	About().exec();
+}
+
+void neteK::Gui::quitRequest()
+{
+	if(m_tray_icon)
+		m_tray_icon->deleteLater();
+		
+	emit userQuit();
 }
 
 #include "netek_gui.moc"

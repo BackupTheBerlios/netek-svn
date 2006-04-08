@@ -21,9 +21,6 @@
 #include "netek_netutils.h"
 #include "netek_application.h"
 
-// TODO: fix slow/unreliable behaviour
-// TODO: handle error() stuff with duplicate connect
-
 neteK::FtpHandlerData::FtpHandlerData()
 : m_start(false), m_transfer(false), m_transfer_error(false), m_stop_transfer(false), m_send(false)
 {
@@ -36,10 +33,12 @@ neteK::FtpHandlerData::FtpHandlerData()
 bool neteK::FtpHandlerData::transferError()
 { return m_transfer_error; }
 
-void neteK::FtpHandlerData::setTransferErrorIfRealError(QAbstractSocket::SocketError err)
+void neteK::FtpHandlerData::handleError(QAbstractSocket::SocketError err)
 {
 	if(err != QAbstractSocket::RemoteHostClosedError)
 		m_transfer_error = true;
+		
+	emit statusSignal();
 }
 
 void neteK::FtpHandlerData::emitStartStatus(bool ok)
@@ -91,8 +90,7 @@ bool neteK::FtpHandlerData::connectSourceSink()
 bool neteK::FtpHandlerData::connectSocket()
 {
 	return m_socket
-		&& connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(setTransferErrorIfRealError(QAbstractSocket::SocketError)))
-		&& connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SIGNAL(statusSignal()))
+		&& connect(m_socket, SIGNAL(error(QAbstractSocket::SocketError)), SLOT(handleError(QAbstractSocket::SocketError)))
 		&& connect(m_socket, SIGNAL(stateChanged(QAbstractSocket::SocketState)), SIGNAL(statusSignal()));
 }
 

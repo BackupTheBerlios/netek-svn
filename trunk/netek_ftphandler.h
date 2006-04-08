@@ -32,7 +32,7 @@ class FtpHandlerData: public QObject {
 	bool m_stop_transfer;
 	
 private slots:
-	void setTransferErrorIfRealError(QAbstractSocket::SocketError err);
+	void handleError(QAbstractSocket::SocketError err);
 
 protected:
 	QPointer<QAbstractSocket> m_socket;
