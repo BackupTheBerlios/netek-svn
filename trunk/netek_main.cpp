@@ -18,7 +18,7 @@
 #include "netek_application.h"
 #include "netek_gui.h"
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 #include <windows.h>
 #endif
 
@@ -28,7 +28,7 @@ int main(int argc, char *argv[])
 		time(0)
 #if defined(Q_OS_UNIX)
 		+ getpid()
-#elif defined(Q_OS_WIN32)
+#elif defined(Q_OS_WIN)
 		+ GetCurrentProcessId() + GetCurrentThreadId()
 #endif
 	);

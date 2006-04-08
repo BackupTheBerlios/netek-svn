@@ -36,7 +36,7 @@ static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
 static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK";
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 #include <windows.h>
 static const wchar_t g_regkey[] = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
 static const wchar_t g_subkey[] = L"netek";
@@ -45,7 +45,62 @@ static const char g_app_data[] = "Application Data/netek";
 
 namespace neteK {
 
-// TODO: IPC win32
+#ifdef Q_OS_WIN
+class IPC: public QWidget {
+	Q_OBJECT;
+	
+	static QString name()
+	{ return QString("%1 IPC").arg(qApp->applicationName()); }
+	
+signals:
+	void commandReceived(QStringList args);
+
+public:
+	IPC(QObject *p)
+	{
+		connect(p, SIGNAL(destroyed()), SLOT(deleteLater()));
+		setWindowTitle(name());
+	}
+	
+	bool winEvent(MSG *message, long *result)
+	{
+		if(message->message == WM_COPYDATA) {
+			COPYDATASTRUCT *cds = (COPYDATASTRUCT*)message->lParam;
+			qDebug() << "Received" << cds->cbData << "bytes";
+			
+			QByteArray in((char*)cds->lpData, cds->cbData);
+			QDataStream data(&in, QIODevice::ReadOnly);
+			QStringList args;
+			data >> args;
+			emit commandReceived(args);
+
+			*result = TRUE;
+			return true;
+		}
+		
+		return QWidget::winEvent(message, result);
+	}
+	
+	static bool sendCommand(QStringList args)
+	{
+		HWND wnd = FindWindow(0, name().toStdWString().c_str());
+		if(wnd) {
+			qDebug() << "Found IPC window:" << wnd;
+			
+			QByteArray out;
+			QDataStream data(&out, QIODevice::WriteOnly);
+			data << args;
+			
+			COPYDATASTRUCT cds;
+			ZeroMemory(&cds, sizeof(cds));
+			cds.lpData = out.data();
+			cds.cbData = out.size();
+			return SendMessage(wnd, WM_COPYDATA, 0, (LPARAM)&cds);
+		}
+		return false;
+	}
+};
+#endif
 
 #ifdef Q_OS_UNIX
 class IPC: public QObject {
@@ -162,6 +217,7 @@ neteK::Application::Application(int &argc, char **argv)
 {
 	setOrganizationName("neteK");
 	setApplicationName("neteK");
+	setQuitOnLastWindowClosed(false);
 
 	connect(this, SIGNAL(processCommandsSignal()), SLOT(processCommandsSlot()), Qt::QueuedConnection);
 	
@@ -169,13 +225,13 @@ neteK::Application::Application(int &argc, char **argv)
 	
 	{
 		QStringList args = arguments();
-		if(args.size() >= 2) {
+		if(args.size() >= 1)
 			args.pop_front();
-			if(IPC::sendCommand(args))
-				::exit(0);
-			else
-				processCommand(args);
-		}
+			
+		if(IPC::sendCommand(args))
+			::exit(0);
+		else
+			processCommand(args);
 	}
 	
 	setWindowIcon(QIcon(":/icons/netek.png"));
@@ -208,20 +264,16 @@ neteK::Application::Application(int &argc, char **argv)
 	}
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 	HKEY key;
-	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
+	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, g_regkey, 0, KEY_WRITE, &key)) {
 		std::wstring str(applicationFilePath().toStdWString());
-		RegSetValueEx(key, subkey, 0, REG_SZ, (const BYTE*)str.c_str(), str.size() * sizeof(wchar_t));
+		RegSetValueEx(key, g_subkey, 0, REG_SZ, (const BYTE*)str.c_str(), str.size() * sizeof(wchar_t));
 		RegCloseKey(key);
 	}
 #endif
 
-	{
-		QPointer<IPC> ipc = new IPC;
-		ipc->setParent(this);
-		connect(ipc, SIGNAL(commandReceived(QStringList)), SLOT(processCommand(QStringList)));
-	}
+	connect(new IPC(this), SIGNAL(commandReceived(QStringList)), SLOT(processCommand(QStringList)));
 }
 
 void neteK::Application::processCommand(QStringList cmd)
@@ -262,10 +314,10 @@ void neteK::Application::userQuit()
 	QFile(QDir::home().filePath(g_gnome_autostart)).remove();
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 	HKEY key;
-	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, regkey, 0, KEY_WRITE, &key)) {
-		RegDeleteValue(key, subkey);
+	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, g_regkey, 0, KEY_WRITE, &key)) {
+		RegDeleteValue(key, g_subkey);
 		RegCloseKey(key);
 	}
 #endif

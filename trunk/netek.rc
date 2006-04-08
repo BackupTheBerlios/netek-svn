@@ -1,1 +1,4 @@
-0 ICON "icons/netek.ico"
+#include "netek_rc.h"
+
+NETEK_ICON_ACTIVE ICON "icons/netek.ico"
+NETEK_ICON_INACTIVE ICON "icons/netek_grey.ico"

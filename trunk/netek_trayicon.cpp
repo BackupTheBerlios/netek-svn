@@ -29,6 +29,7 @@
 
 #ifdef Q_WS_WIN
 #include <windows.h>
+#include "netek_rc.h"
 #endif
 
 namespace neteK {
@@ -74,10 +75,6 @@ class TrayIconX11: public TrayIcon {
 	bool m_active;
 	bool m_docked;
 	//Atom m_xembed;
-
-signals:
-	void activated();
-	void showMenu(const QPoint &pos);
 
 public:
 	TrayIconX11(QMainWindow *owner)
@@ -197,74 +194,78 @@ public slots:
 #endif
 
 #ifdef Q_WS_WIN
-class TrayIconWin32: public QWidget {
-    Q_OBJECT;
+class TrayIconWin32: public TrayIcon {
+	Q_OBJECT;
+	
+	HANDLE m_icon_active, m_icon_inactive;
+	bool m_active, m_notify;
+	
+	bool notify(DWORD msg)
+	{
+		NOTIFYICONDATA ndata;
+		ZeroMemory(&ndata, sizeof(ndata));
+		ndata.cbSize = sizeof(ndata);
+		ndata.hWnd = winId();
+		ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
+		ndata.uCallbackMessage = WM_USER;
+		wcscpy(ndata.szTip, qApp->applicationName().toStdWString().substr(0, 50).c_str());
+		ndata.hIcon = (HICON)(m_active ? m_icon_active : m_icon_inactive);
+		
+		return Shell_NotifyIcon(msg, &ndata);
+	}
 
-    HANDLE m_hIcon;
-    bool m_notify;
+	TrayIconWin32(bool &ok)
+	: m_active(false), m_notify(false)
+	{
+		setAttribute(Qt::WA_DeleteOnClose);
 
-    bool notify(DWORD msg)
-    {
-        NOTIFYICONDATA ndata;
-        ZeroMemory(&ndata, sizeof(ndata));
-        ndata.cbSize = sizeof(ndata);
-        ndata.hWnd = winId();
-        ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
-        ndata.uCallbackMessage = WM_USER;
-        wcscpy(ndata.szTip, qApp->applicationName().toStdWString().substr(0, 50).c_str());
-        if(m_hIcon)
-            ndata.hIcon = (HICON)m_hIcon;
-
-        return Shell_NotifyIcon(msg, &ndata);
-    }
-
-    TrayIconWin32(bool &ok)
-    : m_notify(false)
-    {
-        setAttribute(Qt::WA_DeleteOnClose);
-
-        ok = (m_hIcon = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(0)))
-            && (m_notify = notify(NIM_ADD));
+		ok = (m_icon_active = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(NETEK_ICON_ACTIVE)))
+			&& (m_icon_inactive = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(NETEK_ICON_INACTIVE)))
+			&& (m_notify = notify(NIM_ADD));
 
         //QTimer::singleShot(1000, this, SLOT(close()));
-    }
+	}
 
 public:
-    static TrayIconWin32 *make()
-    {
-        bool ok;
-        QPointer<TrayIconWin32> ticon = new TrayIconWin32(ok);
-        if(!ok)
-            delete ticon;
+	static TrayIconWin32 *make()
+	{
+		bool ok;
+		QPointer<TrayIconWin32> ticon = new TrayIconWin32(ok);
+		if(!ok)
+			delete ticon;
+		
+		return ticon;
+	}
 
-        return ticon;
-    }
+	~TrayIconWin32()
+	{
+		if(m_notify)
+			notify(NIM_DELETE);
+	
+		if(m_icon_active)
+			CloseHandle(m_icon_active);
+			
+		if(m_icon_inactive)
+			CloseHandle(m_icon_inactive);
+	}
 
-    ~TrayIconWin32()
-    {
-        if(m_notify)
-            notify(NIM_DELETE);
-
-        if(m_hIcon)
-            CloseHandle(m_hIcon);
-    }
-
-    bool winEvent(MSG *message, long *result)
-    {
-        if(message->message == WM_USER) {
-            if(message->lParam == WM_LBUTTONUP)
-                emit activated();
-            else if(message->lParam == WM_RBUTTONUP || message->lParam == WM_CONTEXTMENU)
-                emit showMenu(QCursor::pos());
-        } else
-            return QWidget::winEvent(message, result);
-
-        return true;
-    }
-
-signals:
-	void activated();
-	void showMenu(const QPoint &pos);
+	bool winEvent(MSG *message, long *result)
+	{
+		if(message->message == WM_USER) {
+			if(message->lParam == WM_LBUTTONUP)
+				emit activated();
+			else if(message->lParam == WM_RBUTTONUP || message->lParam == WM_CONTEXTMENU)
+				emit showMenu(QCursor::pos());
+		}
+		
+		return QWidget::winEvent(message, result);
+	}
+	
+	void setActive(bool yes)
+	{
+		m_active = yes;
+		notify(NIM_MODIFY);
+	}
 };
 #endif
 
@@ -275,7 +276,7 @@ neteK::TrayIcon *neteK::TrayIcon::make(QMainWindow *owner)
 #if defined(Q_WS_X11)
 	return new TrayIconX11(owner);
 #elif defined(Q_WS_WIN)
-    return TrayIconWin32::make();
+	return TrayIconWin32::make();
 #else
 	return 0;
 #endif

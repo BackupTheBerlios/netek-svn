@@ -492,8 +492,8 @@ void neteK::FtpHandler::command_SITE(QString line)
 	
 	if(cmd == "CHMOD") {
 		QRegExp rx("([0-9]+) (.+)");
-		uint mode;
-		bool mode_ok;
+		uint mode = 0;
+		bool mode_ok = false;
 		if(!rx.exactMatch(args)
 			|| (mode = rx.cap(1).toUInt(&mode_ok, 8), !mode_ok)
 			|| mode > 0777)

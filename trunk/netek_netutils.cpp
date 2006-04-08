@@ -27,7 +27,7 @@
 #include <ifaddrs.h>
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 #include <windows.h>
 #include <ws2tcpip.h>
 #endif
@@ -246,7 +246,7 @@ bool neteK::networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs)
 	}
 #endif
 
-#ifdef Q_OS_WIN32
+#ifdef Q_OS_WIN
 	int afs[] = {AF_INET, AF_INET6};
 	for(int af = 0; af < 2; ++af) {
 		SOCKET sock = ::socket(afs[af], SOCK_STREAM, 0);
