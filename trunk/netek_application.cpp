@@ -32,7 +32,8 @@ static const char g_app_data[] = ".netek";
 #include <QX11Info>
 static const char g_kde_autostart[] = ".kde/Autostart/netek";
 static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
-static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK"; // TODO: some better way of integrating with nautilus?
+ // TODO: use nautilus actions (when it gets installed on all distros by default)
+static const char g_nautilus_scripts[] = ".gnome2/nautilus-scripts/neteK";
 #endif
 
 #ifdef Q_OS_WIN32
