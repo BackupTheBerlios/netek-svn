@@ -220,7 +220,7 @@
   </action>
   <action name="actionStop_all" >
    <property name="icon" >
-    <iconset>icons/stop.png</iconset>
+    <iconset resource="icons.qrc" >:/icons/stop.png</iconset>
    </property>
    <property name="text" >
     <string>Stop &amp;all</string>
