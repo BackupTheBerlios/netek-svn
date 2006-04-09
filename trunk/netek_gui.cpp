@@ -25,8 +25,6 @@
 #include "netek_logviewer.h"
 #include "netek_about.h"
 
-// TODO: winexplorer integration
-
 namespace neteK {
 
 class CopyLinkMenu: public QMenu {
