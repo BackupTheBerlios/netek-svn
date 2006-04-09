@@ -164,8 +164,8 @@ private slots:
 	}
 	
 public:
-	IPC()
-	: m_sock(-1)
+	IPC(QObject *p)
+	: QObject(p), m_sock(-1)
 	{
 		if(init(true, m_sock)) {
 			QPointer<QSocketNotifier> n = new QSocketNotifier(m_sock, QSocketNotifier::Read, this);
