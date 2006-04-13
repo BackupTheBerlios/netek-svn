@@ -22,6 +22,8 @@
 #include <windows.h>
 #endif
 
+// TODO: fix %f for konq.
+
 int main(int argc, char *argv[])
 {
 	srand(
