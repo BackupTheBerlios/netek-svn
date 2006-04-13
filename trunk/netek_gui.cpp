@@ -403,16 +403,10 @@ bool neteK::Gui::getDragAndDropPath(const QMimeData *mime, QString &path)
 	QList<QString> files;
 
 	foreach(QUrl url, mime->urls())
-		files.append(url.toLocalFile());
-	
-	files.append(QUrl(mime->text(), QUrl::StrictMode).toLocalFile());
-	files.append(mime->text());
-
-	foreach(QString file, files)
-		if(Shares::resolvePathForShare(file, path))
+		if(Shares::resolveLocalPath(url.toLocalFile(), path))
 			return true;
 
-	return false;
+	return Shares::resolveAnyPath(mime->text(), path);
 }
 
 void neteK::Gui::dragEnterEvent(QDragEnterEvent *e)

@@ -5,4 +5,4 @@ Actions=createShare;
 [Desktop Action createShare]
 Name=Create share with neteK...
 Icon=netek
-Exec=netek createShare %f
+Exec=netek createShare %u

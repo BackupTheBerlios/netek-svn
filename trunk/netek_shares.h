@@ -45,7 +45,8 @@ class Shares: public QObject {
 		Share *share(int i) const;
 		int shares() const;
 		
-		static bool resolvePathForShare(QString file, QString &path);
+		static bool resolveLocalPath(QString file, QString &path);
+		static bool resolveAnyPath(QString file, QString &path);
 
 };
 

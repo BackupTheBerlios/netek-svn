@@ -22,16 +22,16 @@
 #include <windows.h>
 #endif
 
-// TODO: fix %f for konq.
+// TODO: recheck dnd/rightclick createshare on win32
 
 int main(int argc, char *argv[])
 {
 	srand(
-		time(0)
+		time(0) +
 #if defined(Q_OS_UNIX)
-		+ getpid()
+		getpid()
 #elif defined(Q_OS_WIN)
-		+ GetCurrentProcessId() + GetCurrentThreadId()
+		GetCurrentProcessId() + GetCurrentThreadId()
 #endif
 	);
 

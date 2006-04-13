@@ -129,17 +129,23 @@ int neteK::Shares::shares() const
 	return m_shares.size();
 }
 
-bool neteK::Shares::resolvePathForShare(QString file, QString &path)
+bool neteK::Shares::resolveAnyPath(QString file, QString &path)
+{
+	return resolveLocalPath(QUrl(file, QUrl::StrictMode).toLocalFile(), path)
+		|| resolveLocalPath(file, path);
+}
+
+bool neteK::Shares::resolveLocalPath(QString file, QString &path)
 {
 	if(file.size() == 0)
 		return false;
 		
-	qDebug() << "resolvePathForShare is file?" << file;
+	qDebug() << "resolveLocalPath is file?" << file;
 	QFileInfo info1(file);
 	if(info1.isFile())
 		file = info1.path();
 	
-	qDebug() << "resolvePathForShare is directory?" << file;
+	qDebug() << "resolveLocalPath is directory?" << file;
 	QFileInfo info2(file);
 	if(info2.isDir()) {
 		file = info2.canonicalFilePath();
@@ -156,7 +162,7 @@ bool neteK::Shares::resolvePathForShare(QString file, QString &path)
 int neteK::Shares::createShareResolvePath(QString path)
 {
 	return
-		resolvePathForShare(path, path)
+		resolveAnyPath(path, path)
 			? createShareWithSettings(path)
 			: -1;
 }
