@@ -38,6 +38,7 @@ class Shares: public QObject {
 		
 	signals:
 		void changed();
+		void transfer();
 
 	public:
 		Shares();

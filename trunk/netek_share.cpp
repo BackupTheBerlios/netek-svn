@@ -113,6 +113,7 @@ void neteK::Share::handleNewClient()
 		handler->setParent(m_server);
 		
 		connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
+		connect(handler, SIGNAL(transfer()), SIGNAL(transfer()));
 
 		{
 			QHostAddress local = client->localAddress();
@@ -122,7 +123,7 @@ void neteK::Share::handleNewClient()
 			else
 				handler->start(local);
 		}
-			
+		
 		emit statusChanged();
 	}
 }
@@ -138,6 +139,7 @@ void neteK::Share::checkServer()
 	if(m_run && !m_server && status() != StatusUnconfigured) {
 		m_server = new QTcpServer(this);
 		connect(m_server, SIGNAL(newConnection()), SLOT(handleNewClient()));
+		connect(m_server, SIGNAL(newConnection()), SIGNAL(transfer()));
 
 		if(m_server->listen(QHostAddress::Any, m_port)) {
 			new ObjectLog(m_server,

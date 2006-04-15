@@ -18,7 +18,6 @@
 #include "netek_trayicon.h"
 
 // TODO: transparent X11 icon
-// TODO: blinking indicator
 
 #ifdef Q_WS_X11
 #include <QX11Info>
@@ -71,16 +70,18 @@ class TrayIconX11: public TrayIcon {
 	Q_OBJECT;
 
 	QPointer<QMainWindow> m_owner;
-	QPixmap m_icon_active, m_icon_inactive;
-	bool m_active;
+	QPixmap m_icon_active, m_icon_transfer, m_icon_inactive;
+	Mode m_mode;
 	bool m_docked;
 	//Atom m_xembed;
 
 public:
 	TrayIconX11(QMainWindow *owner)
-	: m_owner(owner), m_icon_active(QPixmap(":/icons/netek.png")),
+	: m_owner(owner),
+		m_icon_active(QPixmap(":/icons/netek.png")),
+		m_icon_transfer(QPixmap(":/icons/netek_transfer.png")),
 		m_icon_inactive(QPixmap(":/icons/netek_grey.png")),
-		m_active(false), m_docked(false)
+		m_mode(ModeInactive), m_docked(false)
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setWindowTitle(qApp->applicationName());
@@ -108,7 +109,17 @@ public:
 	{
 		QPainter p(this);
 		p.setRenderHint(QPainter::SmoothPixmapTransform);
-		p.drawPixmap(rect(), m_active ? m_icon_active : m_icon_inactive);
+		
+		switch(m_mode) {
+			case ModeActive:
+				p.drawPixmap(rect(), m_icon_active);
+				break;
+			case ModeTransfer:
+				p.drawPixmap(rect(), m_icon_transfer);
+				break;
+			default:
+				p.drawPixmap(rect(), m_icon_inactive);
+		}
 	}
 
 	void mouseReleaseEvent(QMouseEvent *e)
@@ -139,10 +150,12 @@ public:
 		return QWidget::x11Event(e);
 	}
 	
-	void setActive(bool yes)
+	void setMode(Mode m)
 	{
-		m_active = yes;
-		update();
+		if(m_mode != m) {
+			m_mode = m;
+			update();
+		}
 	}
 
 public slots:
@@ -280,6 +293,51 @@ neteK::TrayIcon *neteK::TrayIcon::make(QMainWindow *owner)
 #else
 	return 0;
 #endif
+}
+
+neteK::TrayIconSwitcher::TrayIconSwitcher(TrayIcon *icon)
+: QObject(icon), m_icon(icon), m_active(false), m_transfer(TransferNone)
+{ }
+
+void neteK::TrayIconSwitcher::setActive(bool yes)
+{
+	if(m_active != yes) {
+		m_active = yes;
+		if(m_icon)
+			m_icon->setMode(m_active ? TrayIcon::ModeActive : TrayIcon::ModeInactive);
+	}
+}
+
+bool neteK::TrayIconSwitcher::checkTransfer(Transfer t)
+{
+	if(m_active && m_icon)
+		return m_transfer == t;
+		
+	m_transfer = TransferNone;
+	return false;
+}
+
+void neteK::TrayIconSwitcher::transferNone()
+{
+	m_transfer = TransferNone;
+}
+
+void neteK::TrayIconSwitcher::transferOff()
+{
+	if(checkTransfer(TransferOn)) {
+		m_transfer = TransferOff;
+		m_icon->setMode(TrayIcon::ModeActive);
+		QTimer::singleShot(250, this, SLOT(transferNone()));
+	}
+}
+
+void neteK::TrayIconSwitcher::transfer()
+{
+	if(checkTransfer(TransferNone)) {
+		m_transfer = TransferOn;
+		m_icon->setMode(TrayIcon::ModeTransfer);
+		QTimer::singleShot(250, this, SLOT(transferOff()));
+	}
 }
 
 #include "netek_trayicon.moc"

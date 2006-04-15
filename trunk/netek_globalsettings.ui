@@ -137,11 +137,28 @@
            <number>6</number>
           </property>
           <item>
-           <widget class="QRadioButton" name="paAutodetect" >
-            <property name="text" >
-             <string>&amp;Autodetect</string>
+           <layout class="QHBoxLayout" >
+            <property name="margin" >
+             <number>0</number>
             </property>
-           </widget>
+            <property name="spacing" >
+             <number>6</number>
+            </property>
+            <item>
+             <widget class="QRadioButton" name="paAutodetect" >
+              <property name="text" >
+               <string>&amp;Autodetect</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="autodetectSettings" >
+              <property name="text" >
+               <string>&amp;Settings...</string>
+              </property>
+             </widget>
+            </item>
+           </layout>
           </item>
           <item>
            <layout class="QHBoxLayout" >
@@ -283,6 +300,7 @@
   <tabstop>tcpFrom</tabstop>
   <tabstop>tcpTo</tabstop>
   <tabstop>paAutodetect</tabstop>
+  <tabstop>autodetectSettings</tabstop>
   <tabstop>paManual</tabstop>
   <tabstop>publicAddress</tabstop>
   <tabstop>ftpUseUnicode</tabstop>
@@ -301,8 +319,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel" >
-     <x>409</x>
-     <y>313</y>
+     <x>426</x>
+     <y>361</y>
     </hint>
     <hint type="destinationlabel" >
      <x>96</x>
@@ -317,8 +335,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel" >
-     <x>500</x>
-     <y>313</y>
+     <x>517</x>
+     <y>361</y>
     </hint>
     <hint type="destinationlabel" >
      <x>179</x>

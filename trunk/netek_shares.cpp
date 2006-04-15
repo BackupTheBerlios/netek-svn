@@ -96,6 +96,7 @@ void neteK::Shares::initShare(Share *s)
 
 	connect(s, SIGNAL(settingsChanged()), SLOT(settingsChanged()));
 	connect(s, SIGNAL(statusChanged()), SIGNAL(changed()));
+	connect(s, SIGNAL(transfer()), SIGNAL(transfer()));
 }
 
 void neteK::Shares::settingsChanged()

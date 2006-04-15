@@ -40,6 +40,7 @@ class Share: public QObject {
 	signals:
 		void settingsChanged();
 		void statusChanged();
+		void transfer();
 
 	public:
 		Share();

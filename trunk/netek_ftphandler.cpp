@@ -353,6 +353,7 @@ void neteK::FtpHandler::start(QHostAddress publ)
 	}
 	
 	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
+	connect(this, SIGNAL(processSignal()), SIGNAL(transfer()));
 
 	init();
 }
@@ -391,6 +392,7 @@ void neteK::FtpHandler::setDataChannel(FtpHandlerData *data)
 		m_data__->setParent(this);
 		connect(m_data__, SIGNAL(startStatus(bool)), SLOT(dataStartStatus(bool)), Qt::QueuedConnection);
 		connect(m_data__, SIGNAL(transferStatus(bool)), SLOT(dataTransferStatus(bool)), Qt::QueuedConnection);
+		connect(m_data__, SIGNAL(transferSignal()), SIGNAL(transfer()));
 	}
 }
 

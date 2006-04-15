@@ -28,6 +28,7 @@ class Share;
 class Shares;
 class LogViewer;
 class TrayIcon;
+class TrayIconSwitcher;
 
 class Gui: public QMainWindow {
 	Q_OBJECT;
@@ -35,6 +36,7 @@ class Gui: public QMainWindow {
 	Ui::Gui ui;
 
 	QPointer<TrayIcon> m_tray_icon;
+	QPointer<TrayIconSwitcher> m_tray_icon_switcher;
 	bool m_save_geometry_timer;
 	QPointer<Shares> m_shares;
 	QPointer<LogViewer> m_log_viewer;

@@ -174,6 +174,7 @@ class FtpHandler: public QObject {
 	
 signals:
 	void processSignal();
+	void transfer();
 	
 private slots:
 	void process();

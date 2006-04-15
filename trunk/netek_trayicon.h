@@ -32,7 +32,32 @@ class TrayIcon: public QWidget {
 	public:		
 		static TrayIcon *make(QMainWindow *owner);
 		
-		virtual void setActive(bool yes) = 0;
+		enum Mode { ModeInactive, ModeActive, ModeTransfer };
+		
+		virtual void setMode(Mode m) = 0;
+};
+
+class TrayIconSwitcher: public QObject {
+		Q_OBJECT;
+		
+		QPointer<TrayIcon> m_icon;
+		bool m_active;
+		
+		enum Transfer { TransferNone, TransferOn, TransferOff };
+		Transfer m_transfer;
+		
+		bool checkTransfer(Transfer t);
+		
+	private slots:
+		void transferOff();
+		void transferNone();
+				
+	public:
+		TrayIconSwitcher(TrayIcon *icon);
+		
+	public slots:
+		void setActive(bool yes);
+		void transfer();
 };
 
 }

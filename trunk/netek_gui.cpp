@@ -141,14 +141,17 @@ neteK::Gui::Gui()
 {
 	ui.setupUi(this);
 
+	m_shares = new Shares;
+	m_shares->setParent(this);
+	
 	m_tray_icon = TrayIcon::make(this);
 	if(m_tray_icon) {
 		connect(m_tray_icon, SIGNAL(activated()), SLOT(toggleVisible()));
 		connect(m_tray_icon, SIGNAL(showMenu(const QPoint &)), SLOT(trayMenu(const QPoint &)));
+		
+		m_tray_icon_switcher = new TrayIconSwitcher(m_tray_icon);
+		connect(m_shares, SIGNAL(transfer()), m_tray_icon_switcher, SLOT(transfer()));
 	}
-
-	m_shares = new Shares;
-	m_shares->setParent(this);
 
 	ui.shareList->setContextMenuPolicy(Qt::CustomContextMenu);
 
@@ -496,8 +499,8 @@ void neteK::Gui::sharesChanged()
 		}
 	}
 	
-	if(m_tray_icon)
-		m_tray_icon->setActive(is_active);
+	if(m_tray_icon_switcher)
+		m_tray_icon_switcher->setActive(is_active);
 
 	ui.actionStop_all->setEnabled(is_active);
 	
