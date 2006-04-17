@@ -2,3 +2,4 @@
 
 NETEK_ICON_ACTIVE ICON "icons/netek.ico"
 NETEK_ICON_INACTIVE ICON "icons/netek_grey.ico"
+NETEK_ICON_TRANSFER ICON "icons/netek_transfer.ico"

@@ -210,8 +210,9 @@ public slots:
 class TrayIconWin32: public TrayIcon {
 	Q_OBJECT;
 	
-	HANDLE m_icon_active, m_icon_inactive;
-	bool m_active, m_notify;
+	HANDLE m_icon_active, m_icon_inactive, m_icon_transfer;
+	bool m_notify;
+	Mode m_mode;
 	
 	bool notify(DWORD msg)
 	{
@@ -222,18 +223,28 @@ class TrayIconWin32: public TrayIcon {
 		ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
 		ndata.uCallbackMessage = WM_USER;
 		wcscpy(ndata.szTip, qApp->applicationName().toStdWString().substr(0, 50).c_str());
-		ndata.hIcon = (HICON)(m_active ? m_icon_active : m_icon_inactive);
+		switch(m_mode) {
+			case ModeActive:
+				ndata.hIcon = (HICON)m_icon_active;
+				break;
+			case ModeTransfer:
+				ndata.hIcon = (HICON)m_icon_transfer;
+				break;
+			default:
+				ndata.hIcon = (HICON)m_icon_inactive;
+		}
 		
 		return Shell_NotifyIcon(msg, &ndata);
 	}
 
 	TrayIconWin32(bool &ok)
-	: m_active(false), m_notify(false)
+	: m_notify(false), m_mode(ModeInactive)
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 
 		ok = (m_icon_active = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(NETEK_ICON_ACTIVE)))
 			&& (m_icon_inactive = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(NETEK_ICON_INACTIVE)))
+			&& (m_icon_transfer = LoadIcon(GetModuleHandle(0), MAKEINTRESOURCE(NETEK_ICON_TRANSFER)))
 			&& (m_notify = notify(NIM_ADD));
 
         //QTimer::singleShot(1000, this, SLOT(close()));
@@ -260,6 +271,9 @@ public:
 			
 		if(m_icon_inactive)
 			CloseHandle(m_icon_inactive);
+			
+		if(m_icon_transfer)
+			CloseHandle(m_icon_transfer);
 	}
 
 	bool winEvent(MSG *message, long *result)
@@ -274,10 +288,12 @@ public:
 		return QWidget::winEvent(message, result);
 	}
 	
-	void setActive(bool yes)
+	void setMode(Mode m)
 	{
-		m_active = yes;
-		notify(NIM_MODIFY);
+		if(m_mode != m) {
+			m_mode = m;
+			notify(NIM_MODIFY);
+		}
 	}
 };
 #endif

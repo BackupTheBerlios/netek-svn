@@ -3,5 +3,6 @@
 
 #define NETEK_ICON_ACTIVE 0
 #define NETEK_ICON_INACTIVE 1
+#define NETEK_ICON_TRANSFER 2
 
 #endif

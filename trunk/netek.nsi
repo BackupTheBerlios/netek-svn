@@ -21,7 +21,7 @@ Section Install
 	SetShellVarContext all
 	SetOutPath "$INSTDIR"
 	File release\netek.exe
-	File c:\qt\4.1.0\bin\mingwm10.dll
+	File f:\qt\4.1.0\bin\mingwm10.dll
 	File /oname=COPYING.txt COPYING
 	WriteUninstaller "$INSTDIR\uninstaller.exe"
 	WriteRegStr HKLM "Software\neteK" "uninstaller" "$INSTDIR\uninstaller.exe"

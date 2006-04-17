@@ -22,8 +22,6 @@
 #include <windows.h>
 #endif
 
-// TODO: recheck dnd/rightclick createshare on win32
-
 int main(int argc, char *argv[])
 {
 	srand(
