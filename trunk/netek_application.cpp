@@ -125,7 +125,7 @@ class IPC: public QObject {
 		return -1 != (sock = ::socket(PF_UNIX, SOCK_STREAM, 0))
 			&& (server
 				? 0 == ::ioctl(sock, FIONBIO, &nblk)
-					&& 0 == ::unlink(path.data())
+					&& (::unlink(path.data()), true)
 					&& 0 == ::bind(sock, (sockaddr*)&addr, addr_len)
 					&& 0 == ::listen(sock, 20)
 				: 0 == ::connect(sock, (sockaddr*)&addr, addr_len));
