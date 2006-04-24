@@ -18,7 +18,6 @@
 #include "netek_netutils.h"
 #include "netek_settings.h"
 
-// TODO: provide settings for autodetect timeouts...?
 // TODO: more tests for autodetection
 
 #ifdef Q_OS_UNIX
@@ -33,6 +32,50 @@
 #endif
 
 namespace neteK {
+
+class DownloadUrl: public QObject {
+	Q_OBJECT;
+	
+	QPointer<QBuffer> m_buffer;
+	QPointer<QHttp> m_http;
+
+private slots:
+	void httpFinished(int, bool error)
+	{
+		if(!error && m_http->lastResponse().isValid() && m_http->lastResponse().statusCode() / 100 == 2) {
+			m_buffer->reset();
+			emit done(true);
+		} else
+			emit done(false);
+			
+		deleteLater();
+	}
+	
+public:
+	DownloadUrl(QObject *p)
+	: QObject(p)
+	{ }
+	
+	QBuffer *start(QUrl url)
+	{
+		m_buffer = new QBuffer;
+		
+		if(url.scheme() == "http") {
+			m_buffer->open(QIODevice::ReadWrite);
+			quint16 port = url.port() == -1 ? 80 : url.port();
+			qDebug() << "HTTP download, server:" << url.host() << "port:" << port << "path:" << url.path();
+			m_http = new QHttp(url.host(), port, this);
+			connect(m_http, SIGNAL(requestFinished(int, bool)), SLOT(httpFinished(int, bool)));
+			m_http->get(url.path(), m_buffer);
+		} else
+			emit done(false);
+			
+		return m_buffer;
+	}
+	
+signals:
+	void done(bool);
+};
 
 struct AutoDetectCache {
 	QHostAddress address;
@@ -86,36 +129,35 @@ private slots:
 			emitDefault();
 		}
 	}
-
-	void autoFinished(int id, bool error)
+	
+	void autoFinished(bool ok)
 	{
-		if(id == m_auto_get) {
-			delete g_auto_cache;
-			g_auto_cache = new AutoDetectCache;
+		delete g_auto_cache;
+		g_auto_cache = new AutoDetectCache;
 
-			if(!error && m_auto_http->lastResponse().isValid() && m_auto_http->lastResponse().statusCode() / 100 == 2) {
-				m_auto_buf->reset();
-				if(m_auto_buf->canReadLine()) {
-					QHostAddress addr;
-					if(addr.setAddress(QString::fromUtf8(m_auto_buf->readLine(1000)))) {
-						g_auto_cache->address = addr;
-						g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(300);
-						emitDetected(addr);
-						return;
-					}
-				}
+		if(ok && m_auto_buf->canReadLine()) {
+			QHostAddress addr;
+			if(addr.setAddress(QString::fromUtf8(m_auto_buf->readLine(1000)))) {
+				Settings settings;
+				g_auto_cache->address = addr;
+				g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(
+					settings.autodetectRefreshCustom()
+						? settings.autodetectRefresh()
+						: Settings::autodetectRefreshDefault);
+				emitDetected(addr);
+				return;
 			}
-
-			qWarning() << "Autodetect failed, using default address for 15 seconds";
-			g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
-			emitDefault();
 		}
+
+		qWarning() << "Autodetect failed, using default address for 15 seconds";
+		g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
+		emitDefault();
 	}
 
 	void checkAuto()
 	{
 		if(g_auto_detector) {
-			qWarning() << "Scheduling autodetection into queue";
+			qDebug() << "Scheduling autodetection into queue";
 			connect(g_auto_detector, SIGNAL(destroyed()), SLOT(checkAuto()), Qt::QueuedConnection);
 			return;
 		}
@@ -134,12 +176,16 @@ private slots:
 				emitDetected(g_auto_cache->address);
 		} else {
 			qDebug() << "Performing autodetect";
-			m_auto_buf = new QBuffer(this);
-			m_auto_buf->open(QIODevice::ReadWrite);
-			m_auto_http = new QHttp(this);
-			connect(m_auto_http, SIGNAL(requestFinished(int, bool)), SLOT(autoFinished(int, bool)));
-			m_auto_http->setHost("netek.berlios.de");
-			m_auto_get = m_auto_http->get("/cgi-bin/myip", m_auto_buf);
+			
+			Settings settings;
+			
+			m_auto_buf = downloadUrl(
+				settings.autodetectAddressCustom()
+					? settings.autodetectAddress()
+					: Settings::autodetectAddressDefault,
+				this, SLOT(autoFinished(bool)));
+				
+			m_auto_buf->setParent(this);
 		}
 	}
 
@@ -182,6 +228,14 @@ void neteK::resolvePublicAddress(QHostAddress def, QObject *rec, const char *slo
 	QPointer<PublicAddressDetector> det = new PublicAddressDetector(def);
 	QObject::connect(det, SIGNAL(detected(QHostAddress)), rec, slot);
 	det->start();
+}
+
+QBuffer *neteK::downloadUrl(QUrl url, QObject *o, const char *slot)
+{
+	QPointer<DownloadUrl> d = new DownloadUrl(o);
+	o->connect(d, SIGNAL(done(bool)), slot, Qt::QueuedConnection);
+	
+	return d->start(url);
 }
 
 bool neteK::isLoopback(QHostAddress addr)

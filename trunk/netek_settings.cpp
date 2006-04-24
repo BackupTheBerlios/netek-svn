@@ -87,3 +87,28 @@ bool neteK::Settings::ftpUseUnicodeByDefault()
 void neteK::Settings::setFtpUseUnicodeByDefault(bool yes)
 { setValue("ftp/useUnicodeByDefault", yes); }
 
+bool neteK::Settings::autodetectAddressCustom()
+{ return value("autodetect/web/url_custom", false).toBool(); }
+
+void neteK::Settings::setAutodetectAddressCustom(bool yes)
+{ setValue("autodetect/web/url_custom", yes); }
+
+const char *neteK::Settings::autodetectAddressDefault = "http://netek.berlios.de/cgi-bin/myip";
+ 
+QString neteK::Settings::autodetectAddress()
+{ return value("autodetect/web/url", autodetectAddressDefault).toString(); }
+
+void neteK::Settings::setAutodetectAddress(QString addr)
+{ setValue("autodetect/web/url", addr); }
+
+bool neteK::Settings::autodetectRefreshCustom()
+{ return value("autodetect/web/refresh_custom", false).toBool(); }
+
+void neteK::Settings::setAutodetectRefreshCustom(bool yes)
+{ setValue("autodetect/web/refresh_custom", yes); }
+
+uint neteK::Settings::autodetectRefresh()
+{ return value("autodetect/web/refresh", autodetectRefreshDefault).toUInt(); }
+
+void neteK::Settings::setAutodetectRefresh(uint secs)
+{ setValue("autodetect/web/refresh", secs); }

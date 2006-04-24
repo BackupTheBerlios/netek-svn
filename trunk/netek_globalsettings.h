@@ -30,6 +30,7 @@ class GlobalSettings: public QDialog {
 	public slots:
 		virtual void accept();
 		void publicAddressRadio();
+		void showAutodetectSettings();
 
 	public:
 		GlobalSettings();

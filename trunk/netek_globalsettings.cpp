@@ -17,6 +17,7 @@
 
 #include "netek_globalsettings.h"
 #include "netek_settings.h"
+#include "netek_adetectsettings.h"
 
 neteK::GlobalSettings::GlobalSettings()
 {
@@ -33,8 +34,14 @@ neteK::GlobalSettings::GlobalSettings()
 	
 	connect(ui.paAutodetect, SIGNAL(clicked()), SLOT(publicAddressRadio()));
 	connect(ui.paManual, SIGNAL(clicked()), SLOT(publicAddressRadio()));
+	connect(ui.autodetectSettings, SIGNAL(clicked()), SLOT(showAutodetectSettings()));
 	
 	publicAddressRadio();
+}
+
+void neteK::GlobalSettings::showAutodetectSettings()
+{
+	AutodetectSettings().exec();
 }
 
 void neteK::GlobalSettings::publicAddressRadio()

@@ -38,6 +38,20 @@ public:
 	PublicAddress publicAddress();
 	void setPublicAddress(PublicAddress a);
 	
+	bool autodetectAddressCustom();
+	void setAutodetectAddressCustom(bool yes);
+	
+	static const char *autodetectAddressDefault;
+	QString autodetectAddress();
+	void setAutodetectAddress(QString addr);
+	
+	bool autodetectRefreshCustom();
+	void setAutodetectRefreshCustom(bool yes);
+	
+	static const uint autodetectRefreshDefault = 300;
+	uint autodetectRefresh();
+	void setAutodetectRefresh(uint secs);
+	
 	QString customPublicAddress();
 	void setCustomPublicAddress(QString addr);
 	

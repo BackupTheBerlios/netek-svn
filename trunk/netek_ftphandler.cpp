@@ -114,13 +114,13 @@ void neteK::FtpHandlerData::transferEvent()
 			//qDebug() << "Read" << read;
 			if(read <= 0) {
 				if(read < 0) {
-					qDebug() << "Error reading";
+					qWarning() << "Error reading";
 					m_transfer_error = true;
 					m_stop_transfer = true;
 				} else if(!source->isSequential())
 					m_stop_transfer = true;
 			} else if(read != sink->write(buf, read)) {
-				qDebug() << "Error writing";
+				qWarning() << "Error writing";
 				m_transfer_error = true;
 				m_stop_transfer = true;
 			} else if(source->isSequential()) {

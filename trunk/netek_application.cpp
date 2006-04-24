@@ -153,7 +153,7 @@ private slots:
 						data >> args;
 						emit commandReceived(args);
 					} else
-						qDebug() << "IPC read error:" << strerror(errno);
+						qWarning() << "IPC read error:" << strerror(errno);
 					break;
 				} else
 					in.append(QByteArray(buf, read));
@@ -172,7 +172,7 @@ public:
 			connect(n, SIGNAL(activated(int)), SLOT(accept(int)));
 			n->setEnabled(true);
 		} else {
-			qDebug() << "IPC server failed to start:" << strerror(errno);
+			qWarning() << "IPC server failed to start:" << strerror(errno);
 			deleteLater();
 		}
 	}

@@ -15,29 +15,29 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-#ifndef __NETEK_NETUTILS_H__
-#define __NETEK_NETUTILS_H__
+#ifndef __NETEK_ADETECTSETTINGS_H__
+#define __NETEK_ADETECTSETTINGS_H__
 
-#include <QtCore>
-#include <QtNetwork>
+#include "ui_netek_adetectsettings.h"
+
+#include <QtGui>
 
 namespace neteK {
 
-	const int networkBufferSize = 65536;
+class AutodetectSettings: public QDialog {
+		Q_OBJECT;
 
-	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
-	
-	// slot(bool status)
-	QBuffer *downloadUrl(QUrl url, QObject *, const char *);
+	public slots:
+		virtual void accept();
+		void changeState();
 
-	bool isPrivateNetwork(QHostAddress addr);
-	bool isLoopback(QHostAddress addr);
-	bool isOtherNonPublic(QHostAddress addr);
-	bool isPublicNetwork(QHostAddress addr);
+	public:
+		AutodetectSettings();
 
-	bool networkInterfaces(QList<QPair<QString, QHostAddress> > &nifs);
+	private:
+		Ui::AutodetectSettings ui;
+};
 
-	quint16 randomPort();
 }
 
 #endif
