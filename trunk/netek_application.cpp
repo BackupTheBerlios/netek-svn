@@ -210,7 +210,7 @@ QDir neteK::Application::applicationData()
 { return QDir(QDir::home().absoluteFilePath(g_app_data)); }
 
 QString neteK::Application::applicationVersion()
-{ return "0.8.1"; }
+{ return "0.8.2"; }
 
 neteK::Application::Application(int &argc, char **argv)
 : QApplication(argc, argv)

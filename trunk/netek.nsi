@@ -1,5 +1,5 @@
-Name "neteK 0.8.1"
-Outfile "netek-0.8.1.exe"
+Name "neteK 0.8.2"
+Outfile "netek-0.8.2.exe"
 XPStyle on
 InstallDir "$PROGRAMFILES\netek"
 

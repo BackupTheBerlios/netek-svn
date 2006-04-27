@@ -18,8 +18,6 @@
 #include "netek_netutils.h"
 #include "netek_settings.h"
 
-// TODO: more tests for autodetection
-
 #ifdef Q_OS_UNIX
 #include <sys/types.h>
 #include <sys/socket.h>

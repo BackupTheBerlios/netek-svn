@@ -1,6 +1,6 @@
 Summary: system tray FTP and webdav server
 Name: netek
-Version: 0.8.1
+Version: 0.8.2
 Release: 1
 License: GPL
 Group: Applications/Internet

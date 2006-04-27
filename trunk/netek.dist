@@ -2,7 +2,7 @@
 
 set -ex
 
-ver=0.8.1
+ver=0.8.2
 
 root=`pwd`
 rm -fr .dist
