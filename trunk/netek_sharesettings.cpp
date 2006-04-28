@@ -65,7 +65,7 @@ void neteK::ShareSettings::securityRadio()
 
 void neteK::ShareSettings::folderBrowse()
 {
-	QString name = QFileDialog::getExistingDirectory(this, tr("Select share folder"), ui.folder->text());
+	QString name = QDir::convertSeparators(QFileDialog::getExistingDirectory(this, tr("Select share folder"), ui.folder->text()));
 	if(name.size())
 		ui.folder->setText(name);
 }

@@ -9,7 +9,7 @@ test -e qmake.conf.orig || {
 }
 cd ../..
 
-./configure -prefix "$HOME/qt-netek" -release -static -fast -no-exceptions -no-libmng -no-libjpeg -qt-libpng
+./configure -prefix "$HOME/qt-netek" -release -static -fast -no-exceptions -no-stl -no-qt3support -no-libmng -no-libjpeg -qt-libpng
 
 make install_qmake install_mkspecs
 cd src

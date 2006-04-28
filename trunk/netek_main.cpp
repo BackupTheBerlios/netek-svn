@@ -22,6 +22,12 @@
 #include <windows.h>
 #endif
 
+#ifdef Q_OS_UNIX
+#include <unistd.h>
+#endif
+
+#include <ctime>
+
 int main(int argc, char *argv[])
 {
 	srand(

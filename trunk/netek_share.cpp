@@ -22,6 +22,8 @@
 #include "netek_netutils.h"
 #include "netek_application.h"
 
+#include <ctime>
+
 neteK::Share::Share()
 : m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_client_count(0)
 { }

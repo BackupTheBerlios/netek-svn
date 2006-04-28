@@ -24,6 +24,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/ioctl.h>
+#include <unistd.h>
 #include <cerrno>
 static const char g_app_data[] = ".netek";
 #endif
@@ -241,13 +242,16 @@ neteK::Application::Application(int &argc, char **argv)
 	setStyle(new QPlastiqueStyle); // TODO: color is sometimes b0rked under GNOME
 
 	{
-		QString path = QDir::home().filePath(g_kde_autostart);
+		QString path = QDir::home().absoluteFilePath(g_kde_autostart);
+		QDir().mkpath(QFileInfo(path).absolutePath());
 		QFile(path).remove();
 		QFile(applicationFilePath()).link(path);
 	}
 
 	{
-		QFile dfile(QDir::home().filePath(g_gnome_autostart));
+		QString path = QDir::home().absoluteFilePath(g_gnome_autostart);
+		QDir().mkpath(QFileInfo(path).absolutePath());
+		QFile dfile(path);
 		if(dfile.open(QIODevice::WriteOnly))
 			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1\n")
 					.arg(applicationFilePath()).toUtf8());
@@ -255,8 +259,9 @@ neteK::Application::Application(int &argc, char **argv)
 	}
 
 	{
-		QDir::home().mkpath(g_nautilus_scripts);
-		QFile s(QDir(QDir::home().filePath(g_nautilus_scripts)).filePath("Create share..."));
+		QString path = QDir::home().absoluteFilePath(g_nautilus_scripts);
+		QDir().mkpath(path);
+		QFile s(QDir(path).absoluteFilePath("Create share..."));
 		if(s.open(QIODevice::WriteOnly)) {
 			s.write(QString("#! /bin/sh\necho \"$NAUTILUS_SCRIPT_SELECTED_FILE_PATHS\" | while read x; do (%1 createShare \"$x\" &); exit; done\n")
 					.arg(applicationFilePath()).toUtf8());
