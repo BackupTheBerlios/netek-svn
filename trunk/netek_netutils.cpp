@@ -147,7 +147,6 @@ private slots:
 			}
 		}
 
-		// TODO: do emitdefault here
 		qWarning() << "Autodetect failed, using default address for 15 seconds";
 		g_auto_cache->timeout = QDateTime::currentDateTime().addSecs(15);
 		emitDefault();
