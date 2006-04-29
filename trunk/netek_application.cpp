@@ -31,7 +31,6 @@ static const char g_app_data[] = ".netek";
 
 #ifdef Q_WS_X11
 #include <QX11Info>
-// TODO: create directories
 static const char g_kde_autostart[] = ".kde/Autostart/netek";
 static const char g_gnome_autostart[] = ".config/autostart/netek.desktop";
  // TODO: use nautilus actions (when it gets installed on all distros by default)
