@@ -335,8 +335,8 @@ quint16 neteK::randomPort()
 	rnd += rand();
 
 	Settings settings;
-	quint16 min(settings.randomTcpPortMin()), max(settings.randomTcpPortMax());
-	return min + rnd % (max-min+1);
+	quint16 minp(settings.randomTcpPortMin()), maxp(settings.randomTcpPortMax());
+	return minp + rnd % (maxp-minp+1);
 }
 
 #include "netek_netutils.moc"

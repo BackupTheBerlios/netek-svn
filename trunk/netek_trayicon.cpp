@@ -222,7 +222,7 @@ class TrayIconWin32: public TrayIcon {
 		ndata.hWnd = winId();
 		ndata.uFlags = NIF_ICON | NIF_TIP | NIF_MESSAGE;
 		ndata.uCallbackMessage = WM_USER;
-		wcscpy(ndata.szTip, qApp->applicationName().toStdWString().substr(0, 50).c_str());
+		wcscpy(ndata.szTip, (WCHAR*)qApp->applicationName().left(50).utf16());
 		switch(m_mode) {
 			case ModeActive:
 				ndata.hIcon = (HICON)m_icon_active;

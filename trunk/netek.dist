@@ -10,7 +10,7 @@ mkdir .dist
 cd .dist
 mkdir netek-$ver
 cd netek-$ver
-cp $root/COPYING $root/netek_*.{cpp,h,ui} $root/netek_konqueror.desktop $root/netek.{pro,spec,desktop,nsi,dist} $root/icons.qrc $root/build_qt_linux.sh $root/testdir.pl $root/testsum.sh .
+cp $root/COPYING $root/netek_*.{cpp,h,ui} $root/netek_konqueror.desktop $root/netek.{pro,spec,desktop,nsi,dist} $root/icons.qrc $root/build_qt.py $root/testdir.pl $root/testsum.sh .
 mkdir icons
 cd icons
 cp $root/icons/*.{png,ico} .

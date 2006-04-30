@@ -84,7 +84,7 @@ public:
 	
 	static bool sendCommand(QStringList args)
 	{
-		HWND wnd = FindWindow(0, name().toStdWString().c_str());
+		HWND wnd = FindWindow(0, (WCHAR*)name().utf16());
 		if(wnd) {
 			qDebug() << "Found IPC window:" << wnd;
 			
@@ -272,8 +272,9 @@ neteK::Application::Application(int &argc, char **argv)
 #ifdef Q_OS_WIN
 	HKEY key;
 	if(ERROR_SUCCESS == RegOpenKeyEx(HKEY_CURRENT_USER, g_regkey, 0, KEY_WRITE, &key)) {
-		std::wstring str(applicationFilePath().toStdWString());
-		RegSetValueEx(key, g_subkey, 0, REG_SZ, (const BYTE*)str.c_str(), str.size() * sizeof(wchar_t));
+		QString path = QDir::convertSeparators(applicationFilePath());
+		WCHAR *str = (WCHAR*)path.utf16();
+		RegSetValueEx(key, g_subkey, 0, REG_SZ, (BYTE*)str, wcslen(str) * sizeof(WCHAR));
 		RegCloseKey(key);
 	}
 #endif
