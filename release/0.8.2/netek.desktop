@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Encoding=UTF-8
+Name=neteK
+GenericName=File server
+Icon=netek.png
+StartupNotify=false
+Categories=Qt;Network;
+Exec=netek

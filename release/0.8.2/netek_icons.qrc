@@ -1,0 +1,19 @@
+<RCC>
+    <qresource prefix="/" >
+        <file>icons/add.png</file>
+        <file>icons/button_cancel.png</file>
+        <file>icons/configure.png</file>
+        <file>icons/exec.png</file>
+        <file>icons/exit.png</file>
+        <file>icons/folder_grey.png</file>
+        <file>icons/folder_open.png</file>
+        <file>icons/netek.png</file>
+        <file>icons/netek_grey.png</file>
+        <file>icons/netek_transfer.png</file>
+        <file>icons/player_play.png</file>
+        <file>icons/player_stop.png</file>
+        <file>icons/stop.png</file>
+        <file>icons/toggle_log.png</file>
+        <file>icons/www.png</file>
+    </qresource>
+</RCC>
