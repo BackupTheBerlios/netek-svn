@@ -26,7 +26,11 @@ def make(dir, depth, num):
 
 	os.chdir("..")
 
-shutil.rmtree("testdir")
+try:
+	shutil.rmtree("testdir")
+except:
+	pass
+
 make("testdir", 3, 5)
 
 print

@@ -89,13 +89,10 @@ void neteK::LogViewer::copyToClipboard()
 
 void neteK::LogViewer::saveToFile()
 {
-	QFileDialog dlg(this, tr("Save log"), QDir::current().absolutePath());
-	dlg.setAcceptMode(QFileDialog::AcceptSave);
-	dlg.setFileMode(QFileDialog::AnyFile);
-	dlg.selectFile("netek_log.txt");
-	if(QDialog::Accepted == dlg.exec()) {
+	QString file = QFileDialog::getSaveFileName(this, tr("Save log"));
+	if(file.size()) {
 		QByteArray txt = ui.logText->toPlainText().toUtf8();
-		QFile f(dlg.selectedFiles().at(0));
+		QFile f(file);
 		if(!f.open(QIODevice::WriteOnly | QIODevice::Text) || txt.size() != f.write(txt))
 			QMessageBox::critical(this, qApp->applicationName(), tr("Error saving file!"),
 				QMessageBox::Cancel, 0);
