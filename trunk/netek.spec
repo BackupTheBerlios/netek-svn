@@ -14,8 +14,8 @@ neteK is a user-friendly personal FTP and WebDAV server. The program stays in th
 %setup -q
 
 %build
-if [ -x "$QMAKE" ]; then
-	"$QMAKE"
+if [ -x "$NETEKQMAKE" ]; then
+	"$NETEKQMAKE"
 else
 	qmake
 fi

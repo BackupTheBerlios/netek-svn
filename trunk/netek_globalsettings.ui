@@ -309,7 +309,7 @@
   <tabstop>cancelButton</tabstop>
  </tabstops>
  <resources>
-  <include location="icons.qrc" />
+  <include location="netek_icons.qrc" />
  </resources>
  <connections>
   <connection>

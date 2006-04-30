@@ -121,7 +121,7 @@
   </widget>
   <action name="actionDelete" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/button_cancel.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/button_cancel.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Delete</string>
@@ -129,7 +129,7 @@
   </action>
   <action name="actionSettings" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/configure.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/configure.png</iconset>
    </property>
    <property name="text" >
     <string>S&amp;ettings</string>
@@ -137,7 +137,7 @@
   </action>
   <action name="actionStart" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/player_play.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/player_play.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Start</string>
@@ -145,7 +145,7 @@
   </action>
   <action name="actionStop" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/player_stop.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/player_stop.png</iconset>
    </property>
    <property name="text" >
     <string>S&amp;top</string>
@@ -153,7 +153,7 @@
   </action>
   <action name="action_Global_settings" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/configure.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/configure.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Global settings</string>
@@ -161,7 +161,7 @@
   </action>
   <action name="action_Quit" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/exit.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/exit.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Quit</string>
@@ -172,7 +172,7 @@
   </action>
   <action name="action_Create_share" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/add.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/add.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Create share</string>
@@ -180,7 +180,7 @@
   </action>
   <action name="actionNetek" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/netek.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/netek.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;neteK</string>
@@ -188,7 +188,7 @@
   </action>
   <action name="action_Create" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/add.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/add.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;Create</string>
@@ -196,7 +196,7 @@
   </action>
   <action name="actionCopy_link" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/www.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/www.png</iconset>
    </property>
    <property name="text" >
     <string>Copy &amp;link</string>
@@ -204,7 +204,7 @@
   </action>
   <action name="actionShow_log" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/toggle_log.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/toggle_log.png</iconset>
    </property>
    <property name="text" >
     <string>Show &amp;log</string>
@@ -212,7 +212,7 @@
   </action>
   <action name="action_About" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/netek.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/netek.png</iconset>
    </property>
    <property name="text" >
     <string>&amp;About neteK</string>
@@ -220,7 +220,7 @@
   </action>
   <action name="actionStop_all" >
    <property name="icon" >
-    <iconset resource="icons.qrc" >:/icons/stop.png</iconset>
+    <iconset resource="netek_icons.qrc" >:/icons/stop.png</iconset>
    </property>
    <property name="text" >
     <string>Stop &amp;all</string>
@@ -232,7 +232,7 @@
   <tabstop>shareList</tabstop>
  </tabstops>
  <resources>
-  <include location="icons.qrc" />
+  <include location="netek_icons.qrc" />
  </resources>
  <connections/>
 </ui>
