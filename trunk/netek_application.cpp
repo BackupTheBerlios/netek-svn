@@ -238,7 +238,7 @@ neteK::Application::Application(int &argc, char **argv)
 	setWindowIcon(QIcon(":/icons/netek.png"));
 
 #ifdef Q_WS_X11
-	setStyle(new QPlastiqueStyle); // TODO: color is sometimes b0rked under GNOME
+	setStyle(new QPlastiqueStyle); // Qt bug - no default plastique under GNOME, fix in 4.2, issue 113397
 
 	{
 		QString path = QDir::home().absoluteFilePath(g_kde_autostart);
