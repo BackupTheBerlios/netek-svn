@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 {
 #ifdef Q_WS_X11
 	if(argc >= 2 && !strcmp(argv[1], "waitabit"))
-		sleep(5); // Qt & GNOME colorscheme bug..., issue 113398
+		sleep(5); // Qt & GNOME colorscheme bug..., task 98507
 #endif
 
 	srand(
@@ -48,7 +48,7 @@ int main(int argc, char *argv[])
 	
 	{
 		QStringList broken;
-		// see Qt bug 105055
+		// see Qt task 105055
 		broken.append("4.1.1");
 		broken.append("4.1.2");
 		
