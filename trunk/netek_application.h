@@ -64,6 +64,7 @@ public:
 	
 signals:
 	void command_createShare(QString file);
+	void command_quit();
 	
 	void processCommandsSignal();
 	

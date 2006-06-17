@@ -310,6 +310,8 @@ void neteK::Application::processCommandsSlot()
 		
 		if(cmd == "createShare" && args.size() >= 2)
 			emit command_createShare(args.at(1));
+		else if(cmd == "quit")
+			emit command_quit();
 	}
 }
 

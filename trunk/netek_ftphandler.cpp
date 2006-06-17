@@ -15,7 +15,8 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
-#include "netek_share.h"
+// TODO: network timeout
+
 #include "netek_settings.h"
 #include "netek_ftphandler.h"
 #include "netek_netutils.h"
@@ -263,12 +264,8 @@ void neteK::FtpHandlerPASV::status()
 
 
 neteK::FtpHandler::FtpHandler(Share *s, QAbstractSocket *control)
-: m_share(s), m_control(control), m_control_channel_blocked(false)
+: ProtocolHandler(s, "FTP", control->peerAddress()), m_control(control), m_control_channel_blocked(false)
 {
-	new ObjectLog(this,
-		tr("New FTP client: %1").arg(m_control->peerAddress().toString()),
-		tr("FTP client is gone: %1").arg(m_control->peerAddress().toString()));
-		
 	Settings settings;
 
 	m_control->setParent(this);
@@ -1091,17 +1088,4 @@ void neteK::FtpHandler::process()
 		} else
 			sendLine(502, "Command not implemented.");
 	}
-}
-
-QString neteK::FtpHandler::me()
-{
-	if(m_control)
-		return tr("FTP client %1").arg(m_control->peerAddress().toString());
-		
-	return tr("FTP client");
-}
-
-void neteK::FtpHandler::logAction(QString what)
-{
-	Application::log()->logLine(QString("(%1) %2").arg(me()).arg(what));
 }

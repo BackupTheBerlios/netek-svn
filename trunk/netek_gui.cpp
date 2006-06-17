@@ -176,6 +176,7 @@ neteK::Gui::Gui()
 	connect(ui.actionShow_log, SIGNAL(triggered()), SLOT(showLog()));
 	connect(ui.action_About, SIGNAL(triggered()), SLOT(showAbout()));
 
+	connect(qApp, SIGNAL(command_quit()), SLOT(quitRequest()));
 	connect(this, SIGNAL(userQuit()), qApp, SLOT(userQuit()), Qt::QueuedConnection);
 
 	sharesChanged();
@@ -193,9 +194,10 @@ neteK::Gui::Gui()
 		h->setStretchLastSection(false);
 
 		QList<int> cwidth = Settings().guiShareListColumns();
-		for(int i=0; i<cwidth.size(); ++i)
-			if(cwidth.at(i) > 0)
-				h->resizeSection(i, cwidth.at(i));
+		if(cwidth.size() == ui.shareList->columnCount())
+			for(int i=0; i<cwidth.size(); ++i)
+				if(cwidth.at(i) > 0)
+					h->resizeSection(i, cwidth.at(i));
 
 		connect(h, SIGNAL(sectionResized(int,int,int)), SLOT(saveGeometryTimer()));
 	}
@@ -242,13 +244,13 @@ void neteK::Gui::saveGeometry()
 
 void neteK::Gui::toggleVisible()
 {
-    if(isVisible())
-        hide();
-    else {
-        show();
-        activateWindow();
-        raise();
-    }
+	if(isVisible())
+		hide();
+	else {
+		show();
+		activateWindow();
+		raise();
+	}
 }
 
 bool neteK::Gui::validAndConfigured(Share *sh)
@@ -444,16 +446,14 @@ void neteK::Gui::sharesChanged()
 			else {
 				item = new QTreeWidgetItem;
 				item->setTextAlignment(0, Qt::AlignLeft | Qt::AlignVCenter);
-				item->setTextAlignment(1, Qt::AlignCenter);
-				item->setTextAlignment(2, Qt::AlignCenter);
-				item->setTextAlignment(3, Qt::AlignCenter);
-				item->setTextAlignment(4, Qt::AlignCenter);
+				for(int col=1; col<ui.shareList->columnCount(); ++col)
+					item->setTextAlignment(col, Qt::AlignCenter);
 
 				{
 					QFont font = item->font(0);
 					font.setBold(true);
-					for(int j=0; j<ui.shareList->columnCount(); ++j)
-						item->setFont(j, font);
+					for(int col=0; col<ui.shareList->columnCount(); ++col)
+						item->setFont(col, font);
 				}
 
 				ui.shareList->addTopLevelItem(item);
@@ -461,6 +461,7 @@ void neteK::Gui::sharesChanged()
 
 			item->setText(0, sh->folder());
 			item->setText(1, QString::number(sh->port()));
+			item->setText(2, Share::niceType(sh->type()));
 
 			{
 				QString flags;
@@ -470,9 +471,9 @@ void neteK::Gui::sharesChanged()
 					flags += 'U';
 
 				if(flags.size())
-					item->setText(2, flags);
+					item->setText(3, flags);
 				else
-					item->setText(2, "-");
+					item->setText(3, "-");
 			}
 
 			QString status;
@@ -493,9 +494,9 @@ void neteK::Gui::sharesChanged()
 			}
 
 			item->setIcon(0, shareIcon(sh));
-			item->setText(3, status);
-			item->setTextColor(3, status_color);
-			item->setText(4, QString::number(sh->clients()));
+			item->setText(4, status);
+			item->setTextColor(4, status_color);
+			item->setText(5, QString::number(sh->clients()));
 		}
 	}
 	
@@ -524,7 +525,7 @@ void neteK::Gui::copyLinkMenu(int id)
 {
 	QPointer<Share> sh = getShare(id);
 	if(validAndConfigured(sh))
-		CopyLinkMenu(sh->URLProtocol(), sh->port()).exec(QCursor::pos());
+		CopyLinkMenu(sh->URLScheme(), sh->port()).exec(QCursor::pos());
 }
 
 void neteK::Gui::showLog()

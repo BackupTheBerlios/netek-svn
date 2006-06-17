@@ -37,6 +37,7 @@ neteK::Shares::Shares()
 		s->setRunStatus(settings.value("run").toBool());
 		s->setReadOnly(settings.value("readOnly").toBool());
 		s->setAccess((neteK::Share::Access)settings.value("access").toInt());
+		s->setType((neteK::Share::Type)settings.value("type").toInt());
 		s->setUsernamePassword(
 				settings.value("username").toString(),
 				settings.value("password").toString());
@@ -112,6 +113,7 @@ void neteK::Shares::settingsChanged()
 		settings.setValue("run", sh->runStatus());
 		settings.setValue("readOnly", sh->readOnly());
 		settings.setValue("access", sh->access());
+		settings.setValue("type", sh->type());
 
 		{
 			QString u,p;

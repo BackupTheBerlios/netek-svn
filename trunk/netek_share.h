@@ -23,6 +23,26 @@
 
 namespace neteK {
 
+class Share;
+
+class ProtocolHandler: public QObject {
+	Q_OBJECT;
+	
+private:
+	QString m_address, m_type;
+	
+protected:
+	QPointer<Share> m_share;
+	
+	ProtocolHandler(Share *share, QString type, QHostAddress addr);
+	
+	void logAction(QString line) const;
+	QString me() const;
+	
+signals:
+	void transfer();
+};
+
 class Share: public QObject {
 		Q_OBJECT;
 
@@ -65,13 +85,18 @@ class Share: public QObject {
 		bool readOnly() const;
 		void setReadOnly(bool yes);
 		
-		QString URLProtocol() const;
+		QString URLScheme() const;
 
 		enum Access { AccessAnonymous, AccessUsernamePassword };
 		Access access() const;
 		void setAccess(Access a);
 		void setUsernamePassword(QString u, QString p);
 		void usernamePassword(QString &u, QString &p) const;
+
+		enum Type { TypeFTP, TypeHTTP };
+		Type type() const;
+		void setType(Type t);
+		static QString niceType(Type t);
 		
 		QString initialFolder() const;
 		bool changeCurrentFolder(QString cwd, QString change, QString &newcwd) const;
@@ -96,8 +121,11 @@ class Share: public QObject {
 		QPointer<QTcpServer> m_server;
 		bool m_readonly;
 		Access m_access;
+		Type m_type;
 		QString m_username, m_password;
 		int m_client_count;
+
+		void initHandler(QObject *);
 		
 		bool filesystemPath(QString cwd, QString path, QString &fspath, bool nonroot) const;
 		

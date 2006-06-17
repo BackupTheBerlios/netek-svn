@@ -11,7 +11,7 @@ if os.name == "nt":
 	build = 'qtvars.bat && make'
 elif os.name == "posix":
 	mkspec = "linux-g++"
-	configure = './configure -prefix "' + os.environ["HOME"] +'/qt-netek" -release -static -fast -no-exceptions -no-stl -no-libmng -no-libjpeg -qt-libpng'
+	configure = './configure -prefix "' + os.environ["HOME"] +'/qt-netek" -release -static -fast -no-exceptions -no-stl -no-qt3support -no-libmng -no-libjpeg -qt-libpng'
 	after = ["make install_qmake install_mkspecs", "cd src && make install"]
 
 os.chdir(os.path.join("mkspecs", mkspec))

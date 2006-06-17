@@ -37,6 +37,10 @@ neteK::ShareSettings::ShareSettings(Share *share)
 	} else
 		ui.port->setValue(m_share->port());
 
+	ui.type->addItem(Share::niceType(Share::TypeHTTP));
+	ui.type->addItem(Share::niceType(Share::TypeFTP));
+	ui.type->setCurrentIndex(m_share->type() == Share::TypeFTP ? 1 : 0);
+
 	ui.readOnly->setChecked(m_share->readOnly());
 	ui.anonymous->setChecked(m_share->access() == Share::AccessAnonymous);
 	ui.authentication->setChecked(m_share->access() == Share::AccessUsernamePassword);
@@ -104,6 +108,8 @@ void neteK::ShareSettings::accept()
 
 	m_share->setFolder(ui.folder->text());
 	m_share->setPort(ui.port->value());
+
+	m_share->setType(ui.type->currentIndex() == 1 ? Share::TypeFTP : Share::TypeHTTP);
 
 	m_share->setReadOnly(ui.readOnly->isChecked());
 

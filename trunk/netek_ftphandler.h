@@ -20,10 +20,10 @@
 
 #include <QtNetwork>
 
+#include "netek_share.h"
+
 namespace neteK {
 	
-class Share;
-
 class FtpHandlerData: public QObject {
 	Q_OBJECT;
 	
@@ -95,7 +95,7 @@ public:
 	virtual void start(QIODevice *dev, bool send);
 };
 
-class FtpHandler: public QObject {
+class FtpHandler: public ProtocolHandler {
 	Q_OBJECT;
 
 	static const int CommandFlagLoggedIn = 1;
@@ -141,8 +141,6 @@ class FtpHandler: public QObject {
 	void command_EPSV(QString);
 	void command_SITE(QString);
 
-
-	QPointer<Share> m_share;
 	QPointer<QAbstractSocket> m_control;
 	QByteArray m_control_buffer;
 	QQueue<QString> m_requests;
@@ -168,13 +166,10 @@ class FtpHandler: public QObject {
 	bool list(QString path, QFileInfoList &lst, bool *dir = 0);
 	static QString quotedPath(QString path);
 	static QString month(int m);
-	QString me();
-	void logAction(QString what);
 	static void parseLine(QString line, QString &cmd, QString &args);
 	
 signals:
 	void processSignal();
-	void transfer();
 	
 private slots:
 	void process();

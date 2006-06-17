@@ -15,6 +15,10 @@
 // along with this program; if not, write to the Free Software
 // Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
+// TODO: show speed in gui
+// TODO: browsable copy link
+// TODO: use kde-config for konq services menu
+
 #include "netek_application.h"
 #include "netek_gui.h"
 
@@ -36,16 +40,19 @@ int main(int argc, char *argv[])
 #endif
 
 	srand(
-		time(0) +
-#if defined(Q_OS_UNIX)
+#ifdef Q_OS_UNIX
 		getpid()
-#elif defined(Q_OS_WIN)
-		GetCurrentProcessId() + GetCurrentThreadId()
 #endif
+
+#ifdef Q_OS_WIN
+		GetCurrentProcessId()
+#endif
+
+		+ clock()
 	);
 
 	neteK::Application app(argc, argv);
-	
+
 	{
 		QStringList broken;
 		// see Qt task 105055

@@ -19,18 +19,36 @@
 #include "netek_settings.h"
 #include "netek_sharesettings.h"
 #include "netek_ftphandler.h"
+#include "netek_httphandler.h"
 #include "netek_netutils.h"
 #include "netek_application.h"
 
-#include <ctime>
+neteK::ProtocolHandler::ProtocolHandler(Share *share, QString type, QHostAddress addr)
+: m_address(addr.toString()), m_type(type), m_share(share)
+{
+	new ObjectLog(this,
+		tr("New %1 client: %2").arg(m_type).arg(m_address),
+		tr("%1 client is gone: %2").arg(m_type).arg(m_address));
+}
+
+QString neteK::ProtocolHandler::me() const
+{
+	return tr("%1 client %2").arg(m_type).arg(m_address);
+}
+
+void neteK::ProtocolHandler::logAction(QString what) const
+{
+	Application::log()->logLine(QString("(%1) %2").arg(me()).arg(what));
+}
+
 
 neteK::Share::Share()
-: m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_client_count(0)
+: m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_type(TypeHTTP), m_client_count(0)
 { }
 
-QString neteK::Share::URLProtocol() const
+QString neteK::Share::URLScheme() const
 {
-	return "ftp";
+	return m_type == TypeHTTP ? "http" : "ftp";
 }
 
 bool neteK::Share::readOnly() const
@@ -67,9 +85,15 @@ void neteK::Share::usernamePassword(QString &u, QString &p) const
 
 bool neteK::Share::authenticate(QString who, QString username, QString password) const
 {
-	if(m_access == AccessAnonymous && username == "anonymous") {
-		logAction(who, tr("authenticated as a guest"));
-		return true;
+	if(m_access == AccessAnonymous) {
+		bool ok = m_type == TypeFTP && username == "anonymous";
+		if(!ok)
+			ok = m_type == TypeHTTP;
+
+		if(ok) {
+			logAction(who, tr("authenticated as a guest"));
+			return true;
+		}
 	}
 
 	if(m_access == AccessUsernamePassword && m_username.size() && m_password.size() && m_username == username && m_password == password) {
@@ -97,9 +121,35 @@ QString neteK::Share::folder() const
 quint16 neteK::Share::port() const
 { return m_port; }
 
+neteK::Share::Type neteK::Share::type() const
+{ return m_type; }
+
+void neteK::Share::setType(Type t)
+{ m_type = t; }
+
+QString neteK::Share::niceType(Type t)
+{
+	switch(t) {
+		case TypeHTTP:
+			return tr("Web folder");
+		case TypeFTP:
+			return tr("FTP");
+	}
+
+	return QString();
+}
+
 int neteK::Share::clients() const
 {
 	return m_client_count;
+}
+
+void neteK::Share::initHandler(QObject *handler)
+{
+	handler->setParent(m_server);
+
+	connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
+	connect(handler, SIGNAL(transfer()), SIGNAL(transfer()));
 }
 
 void neteK::Share::handleNewClient()
@@ -111,15 +161,14 @@ void neteK::Share::handleNewClient()
 
 		++m_client_count;
 		
-		QPointer<FtpHandler> handler = new FtpHandler(this, client);
-		handler->setParent(m_server);
-		
-		connect(handler, SIGNAL(destroyed()), SLOT(clientGone()));
-		connect(handler, SIGNAL(transfer()), SIGNAL(transfer()));
+		if(m_type == TypeHTTP) {
+			initHandler(new HttpHandler(this, client));
+		} else {
+			QPointer<FtpHandler> handler = new FtpHandler(this, client);
+			initHandler(handler);
 
-		{
 			QHostAddress local = client->localAddress();
-			
+
 			if(!isPublicNetwork(local) && isPublicNetwork(client->peerAddress()))
 				resolvePublicAddress(local, handler, SLOT(start(QHostAddress)));
 			else
@@ -345,7 +394,7 @@ QFile *neteK::Share::writeFileUnique(QString who, QString cwd, QString &fname) c
 
 	QString path;
 	if(filesystemPath(cwd, "", path)) {
-		QString prefix(QString("ftp_%1_%2").arg(time(0)).arg(rand() & 0xffff));
+		QString prefix(QString("ftp_%1_%2").arg(QDateTime::currentDateTime().toTime_t()).arg(rand() & 0xffff));
 		for(int i=0; i<100; ++i) {
 			fname = QString("%1_%2").arg(prefix).arg(i);
 			QString fpath = QDir(path).filePath(fname);			
