@@ -197,7 +197,7 @@ neteK::Gui::Gui()
 		if(cwidth.size() == ui.shareList->columnCount())
 			for(int i=0; i<cwidth.size(); ++i)
 				if(cwidth.at(i) > 0)
-					h->resizeSection(i, cwidth.at(i));
+					h->resizeSection(i, cwidth.at(i)); // TODO: breaks with qt 4.1.4
 
 		connect(h, SIGNAL(sectionResized(int,int,int)), SLOT(saveGeometryTimer()));
 	}
