@@ -1044,7 +1044,7 @@ void neteK::FtpHandler::process()
 				break;
 
 			m_control_buffer.append(QByteArray(buf, read));
-			if(m_control_buffer.size() > 10000) {
+			if(m_control_buffer.size() > maxFtpLineSize) {
 				m_control->close();
 				return;
 			}
