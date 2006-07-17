@@ -85,7 +85,7 @@ public:
 	{
 		setAttribute(Qt::WA_DeleteOnClose);
 		setWindowTitle(qApp->applicationName());
-		setMinimumSize(24,24); // a hack for GNOME...
+		setMinimumSize(22,22); // a hack for GNOME...
 
 		/*{
 			TrapErrorsX11 err;
