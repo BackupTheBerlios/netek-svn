@@ -34,26 +34,36 @@ class HttpHandler: public ProtocolHandler {
 	QUrl m_request_url;
 	qint64 m_content_left;
 	bool m_connection_close;
+	
+	QString m_post_upload_dir;
+	QByteArray m_post_upload_next_boundary, m_post_upload_last_boundary;
 
-	enum State { StateNone, StateHeader, StateDownload };
+	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateMultipartUpload, StateMultipartUploadBody };
 	State m_state;
 	
-	QPointer<QIODevice> m_download;
+	QPointer<QIODevice> m_download, m_upload;
 
 	void initResponse_(QHttpResponseHeader &h, int code);
-	bool sendResponse_(const QHttpResponseHeader &h);
-	bool sendResponse(int code, QString content_type = QString(), qint64 content_length = 0);
-	bool redirectTo(QString loc);
+	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
+	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
+	bool redirectTo(State nstate, QString loc);
+	
+	void handleGET();
+	void handlePOST();
 
 	bool read();
 	bool send(const char *buf, qint64 size);
 	void changeState(State s);
 	void terminate();
+	
+	bool bufferMustContain(int &pos, const QByteArray &a, int from = 0);
+	int doesBufferContain(const QByteArray &a, int from = 0);
 
 	static QString getMimeType(QString name);
 
 	static void writeHtmlEscaped(QIODevice *d, QString data);
 	static void writeHtmlAttribute(QIODevice *d, QString key, QString value);
+	static void parseContentType(QString str, QString &ct, QMap<QString, QString> &values);
 
 	class HtmlPage {
 			QPointer<QIODevice> m_out;

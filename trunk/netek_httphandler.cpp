@@ -20,12 +20,31 @@
 #include "netek_application.h"
 #include "netek_mimetype.h"
 
+// TODO: check html & css with validator
+// TODO: check sendResponse & redirectTo
+// TODO: make nice output for all errors
+
 static const char g_css[] =
-"<style>"
+"<style type=\"text/css\">"
 	"body{"
 		"background:#fff;"
-		"padding:12pt;"
+		"padding:0;"
 		"margin:0;"
+		"font-size:10pt;"
+		"text-align:center;"
+	"}"
+	"#error{"
+		"border-style:solid;"
+		"border-color:#666;"
+		"padding:24pt;"
+		"background:#eee;"
+		"margin:auto;"
+	"}"
+	"#title{"
+		"width:100%;"
+		"line-height:24pt;"
+		"font-size:12pt;"
+		"background:#eee;"
 	"}"
 	"table{"
 		"font-size:10pt;"
@@ -35,10 +54,13 @@ static const char g_css[] =
 		"border-style:solid;"
 		"border-width:2px;"
 		"border-color:#666;"
+		"margin-left:auto;"
+		"margin-right:auto;"
 	"}"
 	"#htr{"
 		"background:#666;"
 		"color:#fff;"
+		"font-weight:bold;"
 	"}"
 	"#htd{"
 		"text-align:center;"
@@ -74,6 +96,15 @@ static const char g_css[] =
 		"padding:3pt 9pt 3pt 9pt;"
 	"}"
 "</style>";
+
+static const char g_file_upload[] =
+"<form action=\"upload\" method=\"post\" enctype=\"multipart/form-data\">"
+	"<p>"
+		"Upload file:"
+		" <input type=\"file\" name=\"file\" size=\"45\"/>"
+		" <input type=\"submit\" value=\"Upload\"/>"
+	"</p>"
+"</form>";
 
 static const char g_js_filetable[] =
 "<script>"
@@ -138,7 +169,7 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 			minor = m_request.minorVersion();
 		}
 
-		if(m_request.value("Connection").toLower() == "close")
+		if(m_request.value("connection").toLower() == "close")
 			m_connection_close = true;
 	}
 
@@ -152,13 +183,13 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 #undef HTTP_LESS
 }
 
-bool neteK::HttpHandler::sendResponse_(const QHttpResponseHeader &response)
+bool neteK::HttpHandler::sendResponse_(State nstate, const QHttpResponseHeader &response)
 {
 	if(m_sock) {
 		QByteArray str(response.toString().toUtf8());
 		if(str.size() == m_sock->write(str)) {
 			qDebug() << "HTTP response"  << str;
-			changeState(StateDownload);
+			changeState(nstate);
 			return true;
 		} else
 			terminate();
@@ -167,23 +198,36 @@ bool neteK::HttpHandler::sendResponse_(const QHttpResponseHeader &response)
 	return false;
 }
 
-bool neteK::HttpHandler::sendResponse(int code, QString ct, qint64 cl)
+bool neteK::HttpHandler::sendResponse(State nstate, int code, QString ct, qint64 cl)
 {
 	QHttpResponseHeader response;
 	initResponse_(response, code);
+	if(code == 404) {
+		ct = "text/html; charset=utf-8";
+		if(m_download)
+			m_download->deleteLater();
+		m_download = new QBuffer(this);
+		m_download->open(QIODevice::ReadWrite);
+		{
+			HtmlPage page(m_download, "File not found");
+			m_download->write("<div id=\"error\">File not found</div>");
+		}
+		m_download->reset();
+		cl = m_download->size();
+	}
 	if(ct.size())
 		response.addValue("Content-Type", ct);
 	response.addValue("Content-Length", QString::number(cl));
-	return sendResponse_(response);
+	return sendResponse_(nstate, response);
 }
 
-bool neteK::HttpHandler::redirectTo(QString loc)
+bool neteK::HttpHandler::redirectTo(State nstate, QString loc)
 {
 	QHttpResponseHeader response;
-	initResponse_(response, 303); // TODO: recheck redirect code
+	initResponse_(response, 303);
 	response.addValue("Location", loc);
 	response.addValue("Content-Length", "0");
-	return sendResponse_(response);
+	return sendResponse_(nstate, response);
 }
 
 bool neteK::HttpHandler::send(const char *buf, qint64 size)
@@ -229,6 +273,152 @@ void neteK::HttpHandler::terminate()
 		m_sock->close();
 }
 
+void neteK::HttpHandler::handlePOST()
+{
+	{
+		QRegExp uploadrx("(.*/)upload");
+		if(uploadrx.exactMatch(m_request_url.path())) {
+			m_post_upload_dir = uploadrx.cap(1);
+			QString ct;
+			QMap<QString, QString> values;
+			parseContentType(m_request.value("content-type"), ct, values);
+			if(ct == "multipart/form-data" && values.value("boundary").size()) {
+				m_post_upload_next_boundary += "--" + values.value("boundary").toUtf8() + "\r\n";
+				m_post_upload_last_boundary += "--" + values.value("boundary").toUtf8() + "--\r\n";
+				changeState(StateMultipartUpload);
+			} else
+				sendResponse(StateSkipContent, 400);
+			return;
+		}
+	}
+	
+	sendResponse(StateSkipContent, 404);
+}
+
+void neteK::HttpHandler::handleGET()
+{
+	QFileInfo info;
+	QString ctype, redirect;
+	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+		if(info.isDir()) {
+			if(!m_request_url.path().endsWith('/')) {
+				redirect = m_request_url.path() + '/';
+			} else {
+				QFileInfoList infos;
+				if(m_share->listFolder(m_cwd, m_request_url.path(), infos)) {
+					m_download = new QBuffer(this);
+					m_download->open(QIODevice::ReadWrite);
+
+					{
+						QStringList dirs = m_request_url.path().split('/', QString::SkipEmptyParts);
+						
+						HtmlPage page(m_download, QString("Location: %1").arg('/' + dirs.join("/")));
+						
+						if(dirs.size()) {
+							m_download->write("<div id=\"title\"><a href=\"/\">Top</a>");
+							
+							for(int i=0; i<dirs.size(); ++i) {
+								m_download->write(" / ");
+								
+								if(i != dirs.size()-1) {
+									m_download->write("<a");
+									
+									QString rel;
+									for(int j=0; j<=i; ++j) {
+										rel += '/';
+										rel += dirs.at(j);
+									}
+									
+									writeHtmlAttribute(m_download, "href", rel);
+									m_download->write(">");
+								}
+								
+								writeHtmlEscaped(m_download, dirs.at(i));
+								
+								if(i != dirs.size()-1)
+									m_download->write("</a>");
+							}
+							m_download->write("</div>");
+						} else {
+							m_download->write("<div id=\"title\">Top</div>");
+						}
+						
+						m_download->write(g_file_upload);
+
+						m_download->write(
+							"<table><tr id=\"htr\">"
+							"<td id=\"htd\">File name</td>"
+							"<td id=\"htd\">Size</td>"
+							"<td id=\"htd\">Type</td>"
+							"<td id=\"htd\">Last modified</td>"
+							"</tr>"
+							);
+
+						bool alternate = false;
+
+						foreach(QFileInfo i, infos) {
+							if(alternate)
+								m_download->write("<tr id=\"a\">");
+							else
+								m_download->write("<tr>");
+
+							m_download->write("<td id=\"file\">");
+							m_download->write("<a");
+							if(i.isDir())
+								writeHtmlAttribute(m_download, "href", i.fileName() + '/');
+							else
+								writeHtmlAttribute(m_download, "href", i.fileName());
+							m_download->write(">");
+							writeHtmlEscaped(m_download, i.fileName());
+							m_download->write("</a>");
+							m_download->write("</td>");
+
+							m_download->write("<td id=\"size\">");
+							if(i.isFile())
+								writeHtmlEscaped(m_download, QString::number(i.size()));
+							m_download->write("</td>");
+
+							m_download->write("<td id=\"type\">");
+							if(i.isDir())
+								m_download->write("folder");
+							else
+								writeHtmlEscaped(m_download, getMimeType(i.fileName()));
+							m_download->write("</td>");
+
+							m_download->write("<td id=\"mtime\">");
+							writeHtmlEscaped(m_download, QString::number(
+								i.lastModified().toTime_t()));
+							m_download->write("</td>");
+
+							m_download->write("</tr>");
+
+							alternate = !alternate;
+						}
+
+						m_download->write("</table>");
+					}
+
+					m_download->write(g_js_filetable);
+
+					m_download->reset();
+					ctype = "text/html; charset=utf-8";
+				}
+			}
+		} else if(info.isFile()) {
+			m_download = m_share->readFile(me(), m_cwd, m_request_url.path());
+			m_download->setParent(this);
+			ctype = getMimeType(info.fileName());
+		}
+	}
+
+	if(m_download)
+		sendResponse(StateSkipContent, 200, ctype, m_download->size());
+	else if(redirect.size())
+		redirectTo(StateSkipContent, redirect);
+	else
+		sendResponse(StateSkipContent, 404);
+}
+
 void neteK::HttpHandler::process()
 {
 	if(!m_sock)
@@ -239,23 +429,39 @@ void neteK::HttpHandler::process()
 		return;
 	}
 	
-	qDebug() << "state:" << m_state;
+	if(m_upload) {
+		switch(m_state) {
+			case StateMultipartUploadBody: break;
+			default:
+				qDebug() << "Closing upload";
+				m_upload->deleteLater();
+				m_upload = 0;
+				emit processSignal();
+				return;
+		}
+	}
 
 	switch(m_state) {
 		case StateNone:
+			qDebug() << "StateNone";
 			break;
 
 		case StateHeader: {
+			qDebug() << "StateHeader";
+			
 			if(m_download) {
+				qDebug() << "Closing download";
 				m_download->deleteLater();
 				m_download = 0;
+				emit processSignal();
+				return;
 			}
-
+			
 			int sep;
 			bool header = false;
 			do {
 				sep = m_buffer.indexOf("\r\n\r\n");
-				if(sep < 0 && m_buffer.size() > 100000)
+				if(sep < 0 && m_buffer.size() > maxHttpHeaderSize)
 					terminate();
 
 				if(sep >= 0)
@@ -263,118 +469,52 @@ void neteK::HttpHandler::process()
 			} while(read());
 			
 			if(header) {
+				qDebug() << "HTTP request" << m_buffer.left(sep);
 				m_request = QHttpRequestHeader(QString::fromUtf8(m_buffer.left(sep)));
 				m_buffer.remove(0, sep+4);
 
 				if(m_request.isValid()) {
 					m_request_url = QUrl::fromEncoded(m_request.path().toUtf8(), QUrl::StrictMode);
-					m_content_left = m_request.value("Content-Length").toLongLong();
+					m_content_left = m_request.value("content-length").toLongLong();
 				}
 
-				if(!m_request.isValid() || !m_request_url.isValid() || m_content_left < 0)
-					sendResponse(400);
-				else {
-					qDebug() << "HTTP request" << m_request.toString().toUtf8();
-
+				if(m_request.isValid() && m_request_url.isValid() && m_content_left >= 0) {
 					QString method = m_request.method().toUpper();
-					if(method == "GET") {
-						QFileInfo info;
-						QString ctype, redirect;
-						if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
-							if(info.isDir()) {
-								if(!m_request_url.path().endsWith('/')) {
-									redirect = m_request_url.path() + '/';
-								} else {
-									QFileInfoList infos;
-									if(m_share->listFolder(m_cwd, m_request_url.path(), infos)) {
-										m_download = new QBuffer(this);
-										m_download->open(QIODevice::ReadWrite);
-
-										{
-											HtmlPage page(m_download, QString("Location: %1").arg(m_request_url.path()));
-
-											m_download->write(g_css);
-
-											m_download->write(
-												"<table><tr id=\"htr\">"
-												"<td id=\"htd\">File name</td>"
-												"<td id=\"htd\">Size</td>"
-												"<td id=\"htd\">Type</td>"
-												"<td id=\"htd\">Last modified</td>"
-												"</tr>"
-												);
-
-											bool alternate = false;
-
-											foreach(QFileInfo i, infos) {
-												if(alternate)
-													m_download->write("<tr id=\"a\">");
-												else
-													m_download->write("<tr>");
-
-												m_download->write("<td id=\"file\">");
-												m_download->write("<a");
-												if(i.isDir())
-													writeHtmlAttribute(m_download, "href", i.fileName() + '/');
-												else
-													writeHtmlAttribute(m_download, "href", i.fileName());
-												m_download->write(">");
-												writeHtmlEscaped(m_download, i.fileName());
-												m_download->write("</a>");
-												m_download->write("</td>");
-
-												m_download->write("<td id=\"size\">");
-												if(i.isFile())
-													writeHtmlEscaped(m_download, QString::number(i.size()));
-												m_download->write("</td>");
-
-												m_download->write("<td id=\"type\">");
-												if(i.isDir())
-													m_download->write("folder");
-												else
-													writeHtmlEscaped(m_download, getMimeType(i.fileName()));
-												m_download->write("</td>");
-
-												m_download->write("<td id=\"mtime\">");
-												writeHtmlEscaped(m_download, QString::number(
-													i.lastModified().toTime_t()));
-												m_download->write("</td>");
-
-												m_download->write("</tr>");
-
-												alternate = !alternate;
-											}
-
-											m_download->write("</table>");
-										}
-
-										m_download->write(g_js_filetable);
-
-										m_download->reset();
-										ctype = "text/html; charset=utf-8";
-									}
-								}
-							} else if(info.isFile()) {
-								m_download = m_share->readFile(me(), m_cwd, m_request_url.path());
-								m_download->setParent(this);
-								ctype = getMimeType(info.fileName());
-							}
-						}
-
-						if(m_download)
-							sendResponse(200, ctype, m_download->size());
-						else if(redirect.size())
-							redirectTo(redirect);
-						else
-							sendResponse(404);
-					} else
-						sendResponse(501); // TODO: recheck no method error code
-				}
+					if(method == "GET")
+						handleGET();
+					else if(method == "POST")
+						handlePOST();
+					else
+						sendResponse(StateSkipContent, 501);
+				} else
+					sendResponse(StateDownload, 400);
 			}
 
 			break; }
+			
+		case StateSkipContent:
+			qDebug() << "StateSkipContent" << m_content_left;
+			do {
+				if(m_content_left <= 0 || m_buffer.size() >= m_content_left) {
+					if(m_content_left > 0) {
+						qDebug() << "Skipping" << m_content_left << m_buffer.left(m_content_left);
+						m_buffer.remove(0, m_content_left);
+					}
+					m_content_left = 0;
+					changeState(StateDownload);
+					return;
+				}
+				
+				qDebug() << "Skipping" << m_buffer.size() << m_buffer;
+				
+				m_content_left -= m_buffer.size();
+				m_buffer.clear();
+			} while(read());
+			
+			break;
 
 		case StateDownload:
+			qDebug() << "StateDownload";
 			if(m_sock && m_sock->bytesToWrite())
 				;
 			else if(!m_download || m_download->atEnd()) {
@@ -389,11 +529,129 @@ void neteK::HttpHandler::process()
 					send(buf, ret);
 				else if(ret < 0)
 					terminate();
-
-
 			}
 			break;
+			
+		case StateMultipartUpload:
+			qDebug() << "StateMultipartUpload" << m_content_left << m_buffer;
+			do {
+				if(m_content_left < m_post_upload_next_boundary.size()
+					|| m_buffer.size() >= m_post_upload_next_boundary.size()
+						&& !m_buffer.startsWith(m_post_upload_next_boundary))
+				{
+					sendResponse(StateSkipContent, 400);
+					return;
+				}
+				
+				if(m_buffer.size() < m_post_upload_next_boundary.size())
+					continue;
+				
+				int end_of_header = doesBufferContain("\r\n\r\n", m_post_upload_next_boundary.size());
+				if(end_of_header == -1) {
+					if(m_buffer.size() >= maxHttpHeaderSize) {
+						terminate();
+						return;
+					}
+						
+					continue;
+				}
+				
+				QHttpRequestHeader header(
+					QString::fromUtf8(
+						"GET / HTTP/1.0\r\n"
+						+ m_buffer.mid(
+							m_post_upload_next_boundary.size(),
+							end_of_header - m_post_upload_next_boundary.size())));
+					
+				if(!header.isValid()) {
+					sendResponse(StateSkipContent, 400);
+					return;
+				}
+				
+				qDebug() << "Header" << header.toString();
+				
+				{
+					QString cd;
+					QMap<QString, QString> data;
+					parseContentType(header.value("content-disposition"), cd, data);
+					QString fn = data.value("filename");
+					qDebug() << cd << data.value("name") << fn;
+					if(cd == "form-data" && data.value("name") == "file" && fn.size()) {
+						m_upload = m_share->writeFile(me(), m_cwd, m_post_upload_dir + fn);
+						if(!m_upload) {
+							sendResponse(StateSkipContent, 503);
+							return;
+						}
+					}
+				}
+				
+				int remove = end_of_header + 4;
+				m_buffer.remove(0, remove);
+				m_content_left -= remove;
+				changeState(StateMultipartUploadBody);
+				
+				break;
+			} while(read());
+			
+			break;
+			
+		case StateMultipartUploadBody:
+			qDebug() << "StateMultipartUploadBody" << m_content_left << m_buffer;
+			do {
+				State next = StateMultipartUploadBody;
+				
+				int upto = doesBufferContain(m_post_upload_next_boundary);
+				if(upto != -1)
+					next = StateMultipartUpload;
+				else {
+					upto = doesBufferContain(m_post_upload_last_boundary);
+					if(upto != 1)
+						next = StateSkipContent;
+					else {
+						upto = qMin(m_content_left, (qint64)m_buffer.size() - m_post_upload_last_boundary.size());
+						if(upto <= 0)
+							continue;
+					}
+				}
+					
+				if(upto > 0) {
+					if(m_upload) {
+						if(upto != m_upload->write(m_buffer, upto)) {
+							sendResponse(StateSkipContent, 503);
+							return;
+						}
+					}
+					
+					m_buffer.remove(0, upto);
+					m_content_left -= upto;
+				}
+				
+				if(next == StateSkipContent) {
+					if(m_content_left != m_post_upload_last_boundary.size()) {
+						sendResponse(StateSkipContent, 400);
+						return;
+					}
+					
+					redirectTo(StateSkipContent, m_post_upload_dir);
+					return;
+				}
+				
+				if(next != StateMultipartUploadBody) {
+					changeState(next);
+					return;
+				}
+			} while(read());
+			
+			break;
 	}
+}
+
+int neteK::HttpHandler::doesBufferContain(const QByteArray &a, int from)
+{
+	int pos = m_buffer.indexOf(a, from);
+	if(pos != 1 && pos + a.size() > m_content_left)
+		pos = -1;
+	return pos;
 }
 
 void neteK::HttpHandler::writeHtmlEscaped(QIODevice *d, QString s)
@@ -430,11 +688,14 @@ neteK::HttpHandler::HtmlPage::HtmlPage(QIODevice *d, QString title)
 : m_out(d)
 {
 	m_out->write("<html>");
+	m_out->write("<head>");
 	if(title.size()) {
-		m_out->write("<head><title>");
+		m_out->write("<title>");
 		writeHtmlEscaped(m_out, title);
-		m_out->write("</title></head>");
+		m_out->write("</title>");
 	}
+	m_out->write(g_css);
+	m_out->write("</head>");
 	m_out->write("<body>");
 }
 
@@ -452,4 +713,37 @@ QString neteK::HttpHandler::getMimeType(QString name)
 	if(type)
 		return type;
 	return QString();
+}
+
+void neteK::HttpHandler::parseContentType(QString str, QString &ct, QMap<QString, QString> &values)
+{
+	ct = str;
+	
+	QRegExp rx("([^;]+)(;.*)");
+	if(!rx.exactMatch(str))
+		return;
+	ct = rx.cap(1);
+	str = rx.cap(2);
+	
+	do {
+		qDebug() << "to be matched" << str;
+		rx.setPattern("; ([^ =]+)=\"([^\"]*)\"(.*)"); // TODO: cleanup after Qt 4.2 is released, Qt 4.1.x regexp greedy is buggy
+		if(rx.exactMatch(str)) {
+			QString &value = values[rx.cap(1)];
+			value = rx.cap(2);
+			value.replace("\\\"", "\"");
+			str = rx.cap(3);
+			qDebug() << "quoted rest" << str;
+			continue;
+		}
+		
+		rx.setPattern("; ([^ =]+)=([^;]*)(.*)"); // TODO: cleanup after Qt 4.2 is released, Qt 4.1.x regexp greedy is buggy
+		if(rx.exactMatch(str)) {
+			values[rx.cap(1)] = rx.cap(2);
+			str = rx.cap(3);
+			continue;
+		}
+		
+		qDebug() << "end of match:" << str;
+	} while(false);
 }
