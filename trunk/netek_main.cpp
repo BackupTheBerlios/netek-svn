@@ -34,11 +34,6 @@
 
 int main(int argc, char *argv[])
 {
-#ifdef Q_WS_X11
-	if(argc >= 2 && !strcmp(argv[1], "waitabit"))
-		sleep(5); // Qt & GNOME colorscheme bug..., task 98507
-#endif
-
 	srand(
 #ifdef Q_OS_UNIX
 		getpid()
@@ -64,7 +59,6 @@ int main(int argc, char *argv[])
 				QObject::tr("Your version of Qt has a bug, which is known to break this application.\nBad Qt versions: %1.")
 					.arg(broken.join(", ")),
 				QMessageBox::Ok, QMessageBox::NoButton);
-				    
 	}
 
 	neteK::Gui gui;

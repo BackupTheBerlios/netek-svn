@@ -252,7 +252,7 @@ neteK::Application::Application(int &argc, char **argv)
 		QDir().mkpath(QFileInfo(path).absolutePath());
 		QFile dfile(path);
 		if(dfile.open(QIODevice::WriteOnly))
-			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1 waitabit\n")
+			dfile.write(QString("[Desktop Entry]\nType=Application\nEncoding=UTF-8\nName=neteK\nExec=%1\n")
 					.arg(applicationFilePath()).toUtf8());
 
 	}
