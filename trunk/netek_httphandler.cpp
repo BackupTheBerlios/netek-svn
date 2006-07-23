@@ -55,7 +55,7 @@ static const char g_css[] =
 		"font-size:14pt;"
 		"margin-bottom:18pt;"
 	"}"
-	"table{"
+	".filetable{"
 		"font-size:12pt;"
 		"background:#fff;"
 		"color:#000;"
@@ -105,16 +105,45 @@ static const char g_css[] =
 		"text-align:center;"
 		"padding:3pt 9pt 3pt 9pt;"
 	"}"
+	"#upload{"
+		"margin-left:auto;"
+		"margin-right:auto;"
+	"}"
 "</style>";
 
 static const char g_file_upload[] =
 "<form action=\"upload\" method=\"post\" enctype=\"multipart/form-data\">"
-	"<p>"
-		"Upload file:"
-		" <input type=\"file\" name=\"file\" size=\"45\"/>"
-		" <input type=\"submit\" value=\"Upload\"/>"
-	"</p>"
-"</form>";
+	"<table id=\"upload\">"
+		"<tr>"
+			"<td>Upload file:</td>"
+			"<td><input type=\"file\" name=\"file\" size=\"45\"/></td>"
+			"<td id=\"uploadAction\"><input type=\"submit\" value=\"Upload\"/></td>"
+		"</tr>"
+	"</table>"
+"</form>"
+"<script type=\"text/javascript\">"
+	"var upload=document.getElementById('upload');"
+	"var uploadAction=document.getElementById('uploadAction');"
+	"var uploadMore=document.createElement('input');"
+	"uploadMore.type='button';"
+	"uploadMore.value='More uploads...';"
+	"uploadMore.onclick=function(){"
+		"for(var i=0;i<5;++i){"
+			"var tr=document.createElement('tr');"
+			"upload.appendChild(tr);"
+			"tr.appendChild(document.createElement('td'));"
+			"var td=document.createElement('td');"
+			"tr.appendChild(td);"
+			"var nfile=document.createElement('input');"
+			"nfile.type='file';"
+			"nfile.name='file';"
+			"nfile.size=45;"
+			"td.appendChild(nfile);"
+		"}"
+	"};"
+	"uploadAction.appendChild(document.createTextNode(' '));"
+	"uploadAction.appendChild(uploadMore);"
+"</script>";
 
 static const char g_js_filetable[] =
 "<script type=\"text/javascript\">"
@@ -307,7 +336,7 @@ void neteK::HttpHandler::handlePOST()
 			parseContentType(m_request.value("content-type"), ct, values);
 			if(ct == "multipart/form-data" && values.value("boundary").size()) {
 				m_post_upload_next_boundary = "--" + values.value("boundary").toUtf8() + "\r\n";
-				m_post_upload_last_boundary = "--" + values.value("boundary").toUtf8() + "--\r\n";
+				m_post_upload_last_boundary = "\r\n--" + values.value("boundary").toUtf8() + "--\r\n";
 				changeState(StateMultipartUpload);
 			} else {
 				qDebug() << "Not multipart?";
@@ -371,7 +400,7 @@ void neteK::HttpHandler::handleGET()
 						m_download->write(g_file_upload);
 
 						m_download->write(
-							"<table><tr class=\"htr\">"
+							"<table class=\"filetable\"><tr class=\"htr\">"
 							"<td class=\"htd\">File name</td>"
 							"<td class=\"htd\">Size</td>"
 							"<td class=\"htd\">Type</td>"
@@ -616,6 +645,8 @@ void neteK::HttpHandler::process()
 						}
 					}
 				}
+				
+				m_post_upload_next_boundary.prepend("\r\n");
 				
 				int remove = end_of_header + 4;
 				m_buffer.remove(0, remove);
