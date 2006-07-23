@@ -36,6 +36,7 @@ class HttpHandler: public ProtocolHandler {
 	bool m_connection_close;
 	
 	QString m_post_upload_dir;
+	QString m_post_upload_file;
 	QByteArray m_post_upload_next_boundary, m_post_upload_last_boundary;
 
 	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateMultipartUpload, StateMultipartUploadBody };
@@ -46,6 +47,7 @@ class HttpHandler: public ProtocolHandler {
 	void initResponse_(QHttpResponseHeader &h, int code);
 	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
 	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
+	bool sendErrorResponse(State nstate, int code, QString description = "");
 	bool redirectTo(State nstate, QString loc);
 	
 	void handleGET();
@@ -64,6 +66,7 @@ class HttpHandler: public ProtocolHandler {
 	static void writeHtmlEscaped(QIODevice *d, QString data);
 	static void writeHtmlAttribute(QIODevice *d, QString key, QString value);
 	static void parseContentType(QString str, QString &ct, QMap<QString, QString> &values);
+	static QString errorDescription(int code);
 
 	class HtmlPage {
 			QPointer<QIODevice> m_out;
