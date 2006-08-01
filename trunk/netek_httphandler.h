@@ -39,8 +39,15 @@ class HttpHandler: public ProtocolHandler {
 	QString m_post_upload_file;
 	QByteArray m_post_upload_next_boundary, m_post_upload_last_boundary;
 
-	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateMultipartUpload, StateMultipartUploadBody };
-	State m_state;
+	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateUrlencodedPost,
+		StateMultipartUpload, StateMultipartUploadBody, StateHandleActionPost };
+	State m_state, m_state_after_urlencodedpost;
+	
+	QUrl m_urlencodedpost;
+	
+	QString m_post_action_dir;
+	bool m_post_action_delete_ok;
+	int m_post_action_delete;
 	
 	QPointer<QIODevice> m_download, m_upload;
 
@@ -56,6 +63,7 @@ class HttpHandler: public ProtocolHandler {
 	bool read();
 	bool send(const char *buf, qint64 size);
 	void changeState(State s);
+	void handleUrlencodedPost(State next);
 	void terminate();
 	
 	bool bufferMustContain(int &pos, const QByteArray &a, int from = 0);
@@ -81,6 +89,7 @@ signals:
 
 private slots:
 	void process();
+	void actionDeleteDone(bool ok);
 	
 public:
 	HttpHandler(Share *s, QAbstractSocket *sock);

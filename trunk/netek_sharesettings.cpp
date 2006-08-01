@@ -37,11 +37,14 @@ neteK::ShareSettings::ShareSettings(Share *share)
 	} else
 		ui.port->setValue(m_share->port());
 
-	ui.type->addItem(Share::niceType(Share::TypeHTTP));
-	ui.type->addItem(Share::niceType(Share::TypeFTP));
+	ui.type->addItem(Share::niceTypeLong(Share::TypeHTTP));
+	ui.type->addItem(Share::niceTypeLong(Share::TypeFTP));
 	ui.type->setCurrentIndex(m_share->type() == Share::TypeFTP ? 1 : 0);
 
-	ui.readOnly->setChecked(m_share->readOnly());
+	ui.downloadOnly->setChecked(m_share->permission() == Share::PermissionRO);
+	ui.dropbox->setChecked(m_share->permission() == Share::PermissionDropbox);
+	ui.fullAccess->setChecked(m_share->permission() == Share::PermissionRW);
+	
 	ui.anonymous->setChecked(m_share->access() == Share::AccessAnonymous);
 	ui.authentication->setChecked(m_share->access() == Share::AccessUsernamePassword);
 	connect(ui.anonymous, SIGNAL(clicked()), SLOT(securityRadio()));
@@ -110,8 +113,13 @@ void neteK::ShareSettings::accept()
 	m_share->setPort(ui.port->value());
 
 	m_share->setType(ui.type->currentIndex() == 1 ? Share::TypeFTP : Share::TypeHTTP);
-
-	m_share->setReadOnly(ui.readOnly->isChecked());
+	
+	if(ui.downloadOnly->isChecked())
+		m_share->setPermission(Share::PermissionRO);
+	if(ui.dropbox->isChecked())
+		m_share->setPermission(Share::PermissionDropbox);
+	if(ui.fullAccess->isChecked())
+		m_share->setPermission(Share::PermissionRW);
 
 	if(ui.authentication->isChecked()) {
 		m_share->setAccess(Share::AccessUsernamePassword);

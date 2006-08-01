@@ -35,7 +35,17 @@ neteK::Shares::Shares()
 		s->setFolder(settings.value("folder").toString());
 		s->setPort(settings.value("port").toUInt());
 		s->setRunStatus(settings.value("run").toBool());
-		s->setReadOnly(settings.value("readOnly").toBool());
+		{
+			bool ok;
+			int p = settings.value("permission").toInt(&ok);
+			if(ok)
+				s->setPermission((Share::Permission)p);
+			else
+				s->setPermission(settings.value("readOnly").toBool()  // backward c.
+					? Share::PermissionRO
+					: Share::PermissionRW);
+			
+		}
 		s->setAccess((neteK::Share::Access)settings.value("access").toInt());
 		s->setType((neteK::Share::Type)settings.value("type").toInt());
 		s->setUsernamePassword(
@@ -111,7 +121,8 @@ void neteK::Shares::settingsChanged()
 		settings.setValue("folder", sh->folder());
 		settings.setValue("port", sh->port());
 		settings.setValue("run", sh->runStatus());
-		settings.setValue("readOnly", sh->readOnly());
+		settings.setValue("readOnly", sh->permission() != Share::PermissionRW); // backward c.
+		settings.setValue("permission", sh->permission());
 		settings.setValue("access", sh->access());
 		settings.setValue("type", sh->type());
 

@@ -464,16 +464,11 @@ void neteK::Gui::sharesChanged()
 			item->setText(2, Share::niceType(sh->type()));
 
 			{
-				QString flags;
-				if(sh->readOnly())
-					flags += 'R';
+				QString txt = Share::nicePermission(sh->permission());
 				if(sh->access() == Share::AccessUsernamePassword)
-					flags += 'U';
-
-				if(flags.size())
-					item->setText(3, flags);
-				else
-					item->setText(3, "-");
+					txt = QString("%1 (password required)").arg(txt);
+				
+				item->setText(3, txt);
 			}
 
 			QString status;

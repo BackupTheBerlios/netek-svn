@@ -43,7 +43,7 @@ void neteK::ProtocolHandler::logAction(QString what) const
 
 
 neteK::Share::Share()
-: m_port(0), m_run(false), m_readonly(true), m_access(AccessAnonymous), m_type(TypeHTTP), m_client_count(0)
+: m_port(0), m_run(false), m_permission(PermissionRO), m_access(AccessAnonymous), m_type(TypeHTTP), m_client_count(0)
 { }
 
 QString neteK::Share::URLScheme() const
@@ -51,14 +51,24 @@ QString neteK::Share::URLScheme() const
 	return m_type == TypeHTTP ? "http" : "ftp";
 }
 
-bool neteK::Share::readOnly() const
+neteK::Share::Permission neteK::Share::permission() const
 {
-	return m_readonly;
+	return m_permission;
 }
 
-void neteK::Share::setReadOnly(bool yes)
+void neteK::Share::setPermission(Permission p)
 {
-	m_readonly = yes;
+	m_permission = p;
+}
+
+QString neteK::Share::nicePermission(Permission p)
+{
+	switch(p) {
+		case PermissionRO: return tr("Download only");
+		case PermissionRW: return tr("Full access");
+		case PermissionDropbox: return tr("Dropbox");
+	}
+	return QString();
 }
 
 neteK::Share::Access neteK::Share::access() const
@@ -132,6 +142,18 @@ QString neteK::Share::niceType(Type t)
 	switch(t) {
 		case TypeHTTP:
 			return tr("Web folder");
+		case TypeFTP:
+			return tr("FTP");
+	}
+
+	return QString();
+}
+
+QString neteK::Share::niceTypeLong(Type t)
+{
+	switch(t) {
+		case TypeHTTP:
+			return tr("Web folder (HTTP/WebDAV)");
 		case TypeFTP:
 			return tr("FTP");
 	}
@@ -290,10 +312,10 @@ bool neteK::Share::changeCurrentFolder(QString cwd, QString path, QString &newcw
 bool neteK::Share::rename(QString who, QString cwd, QString path1, QString path2) const
 {
 	bool ret =
-		!m_readonly
+		m_permission == PermissionRW
 		&& filesystemPathNotRoot(cwd, path1, path1)
 		&& filesystemPathNotRoot(cwd, path2, path2)
-		&& !(path2+'/').startsWith(path1+'/') // this prevents Qt from going into infinite loop
+		&& !(path2+'/').startsWith(path1+'/') // this prevents Qt from going into infinite loop (TODO: report this to trolltech)
 		&& QFile(path1).rename(path2);
 		
 	if(ret)
@@ -328,7 +350,7 @@ bool neteK::Share::listFolder(QString cwd, QString path, QFileInfoList &list) co
 bool neteK::Share::createFolder(QString who, QString cwd, QString path) const
 {
 	bool ret =
-		!m_readonly
+		m_permission != PermissionRO
 		&& filesystemPathNotRoot(cwd, path, path)
 		&& QDir().mkdir(path);
 		
@@ -341,7 +363,7 @@ bool neteK::Share::createFolder(QString who, QString cwd, QString path) const
 bool neteK::Share::deleteFolder(QString who, QString cwd, QString path) const
 {
 	bool ret =
-		!m_readonly
+		m_permission == PermissionRW
 		&& filesystemPathNotRoot(cwd, path, path)
 		&& QDir().rmdir(path);
 		
@@ -371,12 +393,14 @@ QFile *neteK::Share::readFile(QString who, QString cwd, QString path, qint64 pos
 
 QFile *neteK::Share::writeFile(QString who, QString cwd, QString path, bool append) const
 {
-	if(m_readonly)
+	if(m_permission == PermissionRO)
 		return 0;
 		
 	if(filesystemPathNotRoot(cwd, path, path)) {
 		QPointer<QFile> file(new QFile(path));
-		if(file->open(append ? QIODevice::Append : QIODevice::WriteOnly)) {
+		if((m_permission == PermissionRW || !file->exists())
+			&& file->open(append ? QIODevice::Append : QIODevice::WriteOnly))
+		{
 			logAction(who, tr("uploading into file %1").arg(path));
 			return file;
 		}
@@ -389,7 +413,7 @@ QFile *neteK::Share::writeFile(QString who, QString cwd, QString path, bool appe
 
 QFile *neteK::Share::writeFileUnique(QString who, QString cwd, QString &fname) const
 {
-	if(m_readonly)
+	if(m_permission == PermissionRO)
 		return 0;
 
 	QString path;
@@ -415,7 +439,7 @@ QFile *neteK::Share::writeFileUnique(QString who, QString cwd, QString &fname) c
 bool neteK::Share::deleteFile(QString who, QString cwd, QString path) const
 {
 	bool ret =
-		!m_readonly
+		m_permission == PermissionRW
 		&& filesystemPathNotRoot(cwd, path, path)
 		&& QFile(path).remove();
 		
@@ -428,7 +452,7 @@ bool neteK::Share::deleteFile(QString who, QString cwd, QString path) const
 QFile *neteK::Share::changeAttributes(QString who, QString cwd, QString path) const
 {
 	QPointer<QFile> ret;
-	if(!m_readonly && filesystemPathNotRoot(cwd, path, path)) {
+	if(m_permission == PermissionRW && filesystemPathNotRoot(cwd, path, path)) {
 		ret = new QFile(path);
 		if(!ret->exists())
 			delete ret;
@@ -496,3 +520,86 @@ void neteK::Share::logAction(QString who, QString what) const
 {
 	Application::log()->logLine(QString("(%1) %2").arg(who).arg(what));
 }
+
+namespace neteK {
+
+class RecursiveDeleteFrame: QObject {
+	Q_OBJECT;
+	
+public:
+	RecursiveDeleteFrame(QObject *parent)
+	: QObject(parent)
+	{ }
+	
+	QFileInfoList files;
+	QFileInfoList::const_iterator file;
+};
+
+}
+
+neteK::RecursiveDelete::RecursiveDelete(QObject *p, QString who, Share *share, QString cwd, QString file)
+: QObject(p), m_who(who), m_share(share), m_cwd(cwd), m_ok(true)
+{
+	RecursiveDeleteFrame *f = new RecursiveDeleteFrame(this);
+	m_stack.append(f);
+	QFileInfo info;
+	if(m_share->fileInformation(m_cwd, file, info)) {
+		f->files.append(info);
+		f->file = f->files.begin();
+	} else {
+		f->file = f->files.end();
+		m_ok = false;
+	}
+	
+	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
+	emit processSignal();
+}
+
+void neteK::RecursiveDelete::process()
+{
+	RecursiveDeleteFrame *f = m_stack.last();
+	if(f->file == f->files.end()) {
+		delete f;
+		m_stack.pop_back();
+		
+		if(m_stack.isEmpty()) {
+			emit done(m_ok);
+			deleteLater();
+			return;
+		}
+		
+		if(!m_share->deleteFolder(m_who, m_cwd, current_path()))
+			m_ok = false;
+		
+		++m_stack.last()->file;
+	} else {
+		QString path = current_path();
+		
+		if(m_share->deleteFile(m_who, m_cwd, path) || m_share->deleteFolder(m_who, m_cwd, path)) {
+			++f->file;
+		} else {
+			RecursiveDeleteFrame *fr = new RecursiveDeleteFrame(this);
+			m_stack.append(fr);
+			if(m_share->listFolder(m_cwd, path, fr->files)) {
+				fr->file = fr->files.begin();
+			} else {
+				fr->files.clear();
+				fr->file = fr->files.end();
+			}
+		}
+	}
+	
+	emit processSignal();
+}
+
+QString neteK::RecursiveDelete::current_path()
+{
+	QString path;
+	foreach(RecursiveDeleteFrame *fr, m_stack) {
+		path += '/';
+		path += fr->file->fileName();
+	}
+	return path;
+}
+
+#include "netek_share.moc"

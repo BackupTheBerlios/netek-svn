@@ -21,6 +21,9 @@
 #include "netek_mimetype.h"
 
 // TODO: check html & css with validator
+// TODO: implement HEAD
+// TODO: implement caching
+// TODO: implement ranges
 
 static const char g_content_type_html[] = "text/html; charset=utf-8";
 
@@ -88,6 +91,10 @@ static const char g_css[] =
 	"a:hover{"
 		"background:#06c;"
 		"color:#fff;"
+	"}"
+	".select{"
+		"text-align:center;"
+		"padding:3pt 9pt 3pt 9pt;"
 	"}"
 	".file{"
 		"text-align:left;"
@@ -162,7 +169,7 @@ static const char g_js_filetable[] =
 			"var n=parseInt(node.innerHTML);"
 			"if(n>=1024){"
 				"var u;"
-				"var units=['KB','MB','GB','TB'];"
+				"var units=['KiB','MiB','GiB','TiB'];"
 				"for(var unit in units){"
 					"n/=1024;"
 					"u=units[unit];"
@@ -181,7 +188,7 @@ static const char g_js_filetable[] =
 "</script>";
 
 neteK::HttpHandler::HttpHandler(Share *s, QAbstractSocket *sock)
-: ProtocolHandler(s, "HTTP", sock->peerAddress()), m_cwd("/"), m_sock(sock), m_state(StateHeader)
+: ProtocolHandler(s, "HTTP", sock->peerAddress()), m_cwd("/"), m_sock(sock), m_state(StateHeader), m_post_action_delete(0)
 {
 	m_sock->setParent(this);
 
@@ -246,12 +253,14 @@ bool neteK::HttpHandler::sendResponse(State nstate, int code, QString ct, qint64
 	if(ct.size())
 		response.addValue("Content-Type", ct);
 	response.addValue("Content-Length", QString::number(cl));
+	if(code == 401)
+		response.addValue("WWW-Authenticate", QString("Basic realm=\"%1\"").arg(qApp->applicationName())); // TODO: realm should be user's description
 	return sendResponse_(nstate, response);
 }
 
 bool neteK::HttpHandler::sendErrorResponse(State nstate, int code, QString description)
 {
-	QString error = errorDescription(code);
+	QString error = QString("%1 %2").arg(code).arg(errorDescription(code));
 	if(m_download)
 		m_download->deleteLater();
 	m_download = new QBuffer(this);
@@ -317,6 +326,17 @@ void neteK::HttpHandler::changeState(State s)
 	emit processSignal();
 }
 
+void neteK::HttpHandler::handleUrlencodedPost(State next)
+{
+	if(m_content_left > maxHttpPostSize) {
+		terminate();
+		return;
+	}
+	
+	m_state_after_urlencodedpost = next;
+	changeState(StateUrlencodedPost);
+}
+
 void neteK::HttpHandler::terminate()
 {
 	changeState(StateNone);
@@ -327,26 +347,30 @@ void neteK::HttpHandler::terminate()
 
 void neteK::HttpHandler::handlePOST()
 {
-	{
-		QRegExp uploadrx("(.*/)upload");
-		if(uploadrx.exactMatch(m_request_url.path())) {
-			m_post_upload_dir = uploadrx.cap(1);
-			QString ct;
-			QMap<QString, QString> values;
-			parseContentType(m_request.value("content-type"), ct, values);
-			if(ct == "multipart/form-data" && values.value("boundary").size()) {
-				m_post_upload_next_boundary = "--" + values.value("boundary").toUtf8() + "\r\n";
-				m_post_upload_last_boundary = "\r\n--" + values.value("boundary").toUtf8() + "--\r\n";
-				changeState(StateMultipartUpload);
-			} else {
-				qDebug() << "Not multipart?";
-				sendResponse(StateSkipContent, 400);
-			}
-			return;
+	QRegExp uploadrx("(.*/)upload");
+	if(uploadrx.exactMatch(m_request_url.path())) {
+		m_post_upload_dir = uploadrx.cap(1);
+		QString ct;
+		QMap<QString, QString> values;
+		parseContentType(m_request.value("content-type"), ct, values);
+		if(ct == "multipart/form-data" && values.value("boundary").size()) {
+			m_post_upload_next_boundary = "--" + values.value("boundary").toUtf8() + "\r\n";
+			m_post_upload_last_boundary = "\r\n--" + values.value("boundary").toUtf8() + "--\r\n";
+			changeState(StateMultipartUpload);
+		} else {
+			sendErrorResponse(StateSkipContent, 400, "multipart/form-data with boundary expected.");
 		}
+		return;
 	}
 	
-	sendResponse(StateSkipContent, 404);
+	QRegExp actionrx("(.*/)action");
+	if(actionrx.exactMatch(m_request_url.path())) {
+		m_post_action_dir = actionrx.cap(1);
+		handleUrlencodedPost(StateHandleActionPost);
+		return;
+	}
+	
+	sendErrorResponse(StateSkipContent, 404);
 }
 
 void neteK::HttpHandler::handleGET()
@@ -397,10 +421,15 @@ void neteK::HttpHandler::handleGET()
 							m_download->write("<div class=\"title\">Top</div>");
 						}
 						
-						m_download->write(g_file_upload);
+						if(m_share->permission() != Share::PermissionRO)
+							m_download->write(g_file_upload);
 
+						m_download->write("<form method=\"post\" action=\"action\"><table class=\"filetable\"><tr class=\"htr\">");
+						
+						if(m_share->permission() == Share::PermissionRW)
+							m_download->write("<td class=\"htd\">Select</td>");
+						
 						m_download->write(
-							"<table class=\"filetable\"><tr class=\"htr\">"
 							"<td class=\"htd\">File name</td>"
 							"<td class=\"htd\">Size</td>"
 							"<td class=\"htd\">Type</td>"
@@ -415,6 +444,12 @@ void neteK::HttpHandler::handleGET()
 								m_download->write("<tr class=\"a\">");
 							else
 								m_download->write("<tr>");
+								
+							if(m_share->permission() == Share::PermissionRW) {
+								m_download->write("<td class=\"select\"><input type=\"checkbox\"");
+								writeHtmlAttribute(m_download, "name", QString("select_%1").arg(i.fileName()));
+								m_download->write("/></td>");
+							}
 
 							m_download->write("<td class=\"file\">");
 							m_download->write("<a");
@@ -450,6 +485,11 @@ void neteK::HttpHandler::handleGET()
 						}
 
 						m_download->write("</table>");
+						
+						if(m_share->permission() == Share::PermissionRW)
+							m_download->write("<p><input type=\"submit\" name=\"delete\" value=\"Delete selected\"/></p>");
+							
+						m_download->write("</form>");
 						
 						m_download->write(g_js_filetable);
 					}
@@ -494,6 +534,9 @@ void neteK::HttpHandler::process()
 				return;
 		}
 	}
+	
+	if(m_post_action_delete > 0)
+		return;
 
 	switch(m_state) {
 		case StateNone:
@@ -502,6 +545,8 @@ void neteK::HttpHandler::process()
 
 		case StateHeader: {
 			qDebug() << "StateHeader";
+			
+			m_urlencodedpost.clear();
 			
 			if(m_download) {
 				qDebug() << "Closing download";
@@ -533,13 +578,33 @@ void neteK::HttpHandler::process()
 				}
 
 				if(m_request.isValid() && m_request_url.isValid() && m_content_left >= 0) {
+					QString user, pwd;
+					
+					QString auth = m_request.value("authorization");
+					if(auth.size()) {
+						QRegExp rx("basic +(.*)", Qt::CaseInsensitive);
+						if(rx.exactMatch(auth)) {
+							QString data = QString::fromUtf8(QByteArray::fromBase64(rx.cap(1).toUtf8()));
+							int split = data.indexOf(':');
+							if(split != -1) {
+								user = data.left(split);
+								pwd = data.mid(split+1);
+							}
+						}
+					}
+					
+					if(!m_share->authenticate(me(), user, pwd)) {
+						sendErrorResponse(StateSkipContent, 401, "Please, enter correct username and password.");
+						return;
+					}
+					
 					QString method = m_request.method().toUpper();
 					if(method == "GET")
 						handleGET();
 					else if(method == "POST")
 						handlePOST();
 					else
-						sendResponse(StateSkipContent, 501);
+						sendErrorResponse(StateSkipContent, 501, QString("Unknown method %1.").arg(method));
 				} else {
 					qDebug() << "Invalid request";
 					sendResponse(StateDownload, 400);
@@ -595,8 +660,7 @@ void neteK::HttpHandler::process()
 					|| m_buffer.size() >= m_post_upload_next_boundary.size()
 						&& !m_buffer.startsWith(m_post_upload_next_boundary))
 				{
-					qDebug() << "No boundary at start";
-					sendResponse(StateSkipContent, 400);
+					sendErrorResponse(StateSkipContent, 400, "Boundary was not found at the start of the request.");
 					return;
 				}
 				
@@ -621,8 +685,7 @@ void neteK::HttpHandler::process()
 							end_of_header - m_post_upload_next_boundary.size())));
 					
 				if(!header.isValid()) {
-					qDebug() << "Invalid part header";
-					sendResponse(StateSkipContent, 400);
+					sendErrorResponse(StateSkipContent, 400, "Cannot parse part header.");
 					return;
 				}
 				
@@ -646,7 +709,8 @@ void neteK::HttpHandler::process()
 					}
 				}
 				
-				m_post_upload_next_boundary.prepend("\r\n");
+				if(!m_post_upload_next_boundary.startsWith("\r\n"))
+					m_post_upload_next_boundary.prepend("\r\n");
 				
 				int remove = end_of_header + 4;
 				m_buffer.remove(0, remove);
@@ -676,8 +740,7 @@ void neteK::HttpHandler::process()
 						upto = qMin(m_content_left, (qint64)m_buffer.size() - m_post_upload_last_boundary.size());
 						if(upto <= 0) {
 							if(m_buffer.size() >= m_content_left) {
-								qDebug() << "Unexpected data at end of multipart";
-								sendResponse(StateSkipContent, 400);
+								sendErrorResponse(StateSkipContent, 400, "Multipart request does not end with boundary.");
 								return;
 							}
 							
@@ -702,8 +765,7 @@ void neteK::HttpHandler::process()
 				
 				if(next == StateSkipContent) {
 					if(m_content_left != m_post_upload_last_boundary.size()) {
-						qDebug() << "Not really at end of multipart, cl:" << m_content_left;
-						sendResponse(StateSkipContent, 400);
+						sendErrorResponse(StateSkipContent, 400, "Last boundary is not at the end of request.");
 						return;
 					}
 					
@@ -718,6 +780,55 @@ void neteK::HttpHandler::process()
 			} while(read());
 			
 			break;
+			
+		case StateUrlencodedPost:
+			qDebug() << "StateUrlencodedPost" << m_buffer.size() << m_content_left;
+			do {
+				if(m_buffer.size() >= m_content_left) {
+					m_urlencodedpost = QUrl::fromEncoded("/?" + m_buffer.left(m_content_left), QUrl::StrictMode);
+					if(!m_urlencodedpost.isValid()) {
+						sendErrorResponse(StateSkipContent, 400, "Cannot parse URL-encoded POST content.");
+						return;
+					}
+					
+					m_buffer.remove(0, m_content_left);
+					m_content_left = 0;
+					changeState(m_state_after_urlencodedpost);
+					return;
+				}
+			} while(read());
+			
+			break;
+			
+		case StateHandleActionPost:
+			qDebug() << "StateHandleActionPost";
+			m_post_action_delete_ok = true;
+			
+			QPair<QString, QString> arg;
+			foreach(arg, m_urlencodedpost.queryItems()) {
+				if(arg.first.startsWith("select_") && arg.second.size()) {
+					++m_post_action_delete;
+					connect(new RecursiveDelete(this, me(), m_share, m_cwd, arg.first.mid(7)),
+						SIGNAL(done(bool)), SLOT(actionDeleteDone(bool)));
+				}
+			}
+			
+			if(m_post_action_delete == 0)
+				redirectTo(StateSkipContent, m_post_action_dir);
+			break;
+	}
+}
+
+void neteK::HttpHandler::actionDeleteDone(bool ok)
+{
+	if(!ok)
+		m_post_action_delete_ok = false;
+	
+	if(--m_post_action_delete == 0) {
+		if(m_post_action_delete_ok)
+			redirectTo(StateSkipContent, m_post_action_dir);
+		else
+			sendErrorResponse(StateSkipContent, 503, "Some files could not be deleted.");
 	}
 }
 
@@ -826,6 +937,7 @@ QString neteK::HttpHandler::errorDescription(int code)
 {
 	switch(code) {
 		case 404: return "File not found";
+		case 401: return "Authorization failure";
 	}
 	return "Error processing request";
 }

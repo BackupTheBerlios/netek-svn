@@ -23,9 +23,10 @@
 
 namespace neteK {
 
-	const int networkBufferSize = 65536;
-	const int maxHttpHeaderSize = 100000;
-	const int maxFtpLineSize = 10000;
+	const qint64 networkBufferSize = 65536;
+	const qint64 maxHttpHeaderSize = 100000;
+	const qint64 maxHttpPostSize = 3000000;
+	const qint64 maxFtpLineSize = 10000;
 
 	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
 	

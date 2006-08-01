@@ -82,8 +82,10 @@ class Share: public QObject {
 
 		QString niceId() const;
 
-		bool readOnly() const;
-		void setReadOnly(bool yes);
+		enum Permission { PermissionRO, PermissionRW, PermissionDropbox };
+		Permission permission() const;
+		void setPermission(Permission p);
+		static QString nicePermission(Permission p);
 		
 		QString URLScheme() const;
 
@@ -97,6 +99,7 @@ class Share: public QObject {
 		Type type() const;
 		void setType(Type t);
 		static QString niceType(Type t);
+		static QString niceTypeLong(Type t);
 		
 		QString initialFolder() const;
 		bool changeCurrentFolder(QString cwd, QString change, QString &newcwd) const;
@@ -119,7 +122,7 @@ class Share: public QObject {
 		quint16 m_port;
 		bool m_run;
 		QPointer<QTcpServer> m_server;
-		bool m_readonly;
+		Permission m_permission;
 		Access m_access;
 		Type m_type;
 		QString m_username, m_password;
@@ -136,6 +139,29 @@ class Share: public QObject {
 		
 		inline bool filesystemPathNotRoot(QString cwd, QString path, QString &fspath) const
 		{ return filesystemPath(cwd, path, fspath, true); }
+};
+
+class RecursiveDeleteFrame;
+class RecursiveDelete: public QObject {
+	Q_OBJECT;
+	
+	QString m_who;
+	QPointer<Share> m_share;
+	QList<RecursiveDeleteFrame*> m_stack;
+	QString m_cwd;
+	bool m_ok;
+	
+	QString current_path();
+	
+public:
+	RecursiveDelete(QObject *parent, QString who, Share *share, QString cwd, QString file);
+	
+signals:
+	void done(bool ok);
+	void processSignal();
+	
+private slots:
+	void process();
 };
 
 }

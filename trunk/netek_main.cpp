@@ -18,6 +18,8 @@
 // TODO: show speed in gui
 // TODO: browsable copy link
 // TODO: use kde-config for konq services menu
+// TODO: remove QPointers on stack
+// TODO: ip based filter
 
 #include "netek_application.h"
 #include "netek_gui.h"
@@ -63,7 +65,7 @@ int main(int argc, char *argv[])
 
 	neteK::Gui gui;
 
-	//gui.show();
+	gui.show();
 
 	return app.exec();
 }
