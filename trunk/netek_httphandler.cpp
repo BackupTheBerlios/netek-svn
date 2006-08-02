@@ -23,7 +23,6 @@
 // TODO: check html & css with validator
 // TODO: implement HEAD
 // TODO: implement caching
-// TODO: implement ranges
 
 static const char g_content_type_html[] = "text/html; charset=utf-8";
 
@@ -206,11 +205,12 @@ neteK::HttpHandler::HttpHandler(Share *s, QAbstractSocket *sock)
 
 void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 {
-#define HTTP_LESS(x1, x2, y1, y2) x1 < y1 || x1 == y1 && x2 < y2
+#define HTTP_LESS(x1, x2, y1, y2) (x1 < y1 || x1 == y1 && x2 < y2)
 
 	int major = 1, minor = 1;
 	m_connection_close = false;
-
+	bool get_like = false;
+	
 	if(m_request.isValid()) {
 		if(HTTP_LESS(m_request.majorVersion(), m_request.minorVersion(), major, minor)) {
 			major = m_request.majorVersion();
@@ -219,14 +219,21 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 
 		if(m_request.value("connection").toLower() == "close")
 			m_connection_close = true;
+			
+		QString method = m_request.method().toUpper();
+		if(method == "GET" || method == "HEAD")
+			get_like = true;
 	}
 
 	if(HTTP_LESS(major, minor, 1, 1))
 		m_connection_close = true;
 
-	response.setStatusLine(code, QString(), major, minor);
+	response.setStatusLine(code, QString(), 1, 1);
 	response.addValue("Server", qApp->applicationName());
 	response.addValue("Connection", m_connection_close ? "Close" : "Keep-Alive");
+	
+	if(code == 206 || code == 416 || code / 100 == 2 && get_like)
+		response.addValue("Accept-Ranges", "bytes");
 
 #undef HTTP_LESS
 }
@@ -255,6 +262,17 @@ bool neteK::HttpHandler::sendResponse(State nstate, int code, QString ct, qint64
 	response.addValue("Content-Length", QString::number(cl));
 	if(code == 401)
 		response.addValue("WWW-Authenticate", QString("Basic realm=\"%1\"").arg(qApp->applicationName())); // TODO: realm should be user's description
+	return sendResponse_(nstate, response);
+}
+
+bool neteK::HttpHandler::sendPartialResponse(State nstate, QString ct, qint64 full, qint64 from, qint64 to)
+{
+	QHttpResponseHeader response;
+	initResponse_(response, 206);
+	if(ct.size())
+		response.addValue("Content-Type", ct);
+	response.addValue("Content-Length", QString::number(to-from+1));
+	response.addValue("Content-Range", QString("bytes %1-%2/%3").arg(from).arg(to).arg(full));
 	return sendResponse_(nstate, response);
 }
 
@@ -505,9 +523,41 @@ void neteK::HttpHandler::handleGET()
 		}
 	}
 
-	if(m_download)
+	if(m_download) {
+		QString range = m_request.value("range");
+		if(range.size()) {
+			qint64 from, to;
+			bool ok = true;
+			QRegExp rx1("bytes=(\\d+)-(\\d+)"), rx2("bytes=(\\d+)-"), rx3("bytes=-(\\d+)");
+			if(rx1.exactMatch(range)) {
+				from = rx1.cap(1).toLongLong();
+				to = rx1.cap(2).toLongLong();
+			} else if(rx2.exactMatch(range)) {
+				from = rx2.cap(1).toLongLong();
+				to = m_download->size()-1;
+			} else if(rx3.exactMatch(range)) {
+				from = m_download->size()-rx3.cap(1).toLongLong();
+				to = m_download->size()-1;
+			} else
+				ok = false;
+				
+			if(ok) {
+				if(from < 0 || to < from || to >= m_download->size())
+					sendResponse(StateSkipContent, 416);
+				else {
+					if(!m_download->seek(from)) {
+						sendErrorResponse(StateSkipContent, 503, QString("Could not skip first %1 bytes in response.").arg(from));
+					} else {
+						m_limit_response_content = to-from+1;
+						sendPartialResponse(StateSkipContent, ctype, m_download->size(), from, to);
+					}
+				}	
+				return;
+			}
+			
+		}
 		sendResponse(StateSkipContent, 200, ctype, m_download->size());
-	else if(redirect.size())
+	} else if(redirect.size())
 		redirectTo(StateSkipContent, redirect);
 	else
 		sendErrorResponse(StateSkipContent, 404);
@@ -547,6 +597,7 @@ void neteK::HttpHandler::process()
 			qDebug() << "StateHeader";
 			
 			m_urlencodedpost.clear();
+			m_limit_response_content = -1;
 			
 			if(m_download) {
 				qDebug() << "Closing download";
@@ -638,7 +689,7 @@ void neteK::HttpHandler::process()
 			qDebug() << "StateDownload";
 			if(m_sock && m_sock->bytesToWrite())
 				;
-			else if(!m_download || m_download->atEnd()) {
+			else if(!m_download || m_download->atEnd() || m_limit_response_content == 0) {
 				if(m_connection_close)
 					terminate();
 				else
@@ -646,9 +697,14 @@ void neteK::HttpHandler::process()
 			} else {
 				char buf[networkBufferSize];
 				qint64 ret = m_download->read(buf, sizeof(buf));
-				if(ret > 0)
+				if(ret > 0) {
+					if(m_limit_response_content >= 0) {
+						if(ret > m_limit_response_content)
+							ret = m_limit_response_content;
+						m_limit_response_content -= ret;
+					}
 					send(buf, ret);
-				else if(ret < 0)
+				} else if(ret < 0)
 					terminate();
 			}
 			break;

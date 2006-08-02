@@ -32,7 +32,7 @@ class HttpHandler: public ProtocolHandler {
 	QByteArray m_buffer;
 	QHttpRequestHeader m_request;
 	QUrl m_request_url;
-	qint64 m_content_left;
+	qint64 m_content_left, m_limit_response_content;
 	bool m_connection_close;
 	
 	QString m_post_upload_dir;
@@ -54,6 +54,7 @@ class HttpHandler: public ProtocolHandler {
 	void initResponse_(QHttpResponseHeader &h, int code);
 	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
 	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
+	bool sendPartialResponse(State nstate, QString content_type, qint64 full_size, qint64 from, qint64 to);
 	bool sendErrorResponse(State nstate, int code, QString description = "");
 	bool redirectTo(State nstate, QString loc);
 	
