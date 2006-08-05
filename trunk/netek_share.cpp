@@ -26,9 +26,17 @@
 neteK::ProtocolHandler::ProtocolHandler(Share *share, QString type, QHostAddress addr)
 : m_address(addr.toString()), m_type(type), m_share(share)
 {
+	m_network_timeout = new QTimer(this);
+	m_network_timeout->setInterval(neteK::networkTimeout * 1000);
+	
+	connect(m_network_timeout, SIGNAL(timeout()), SLOT(networkTimeout()));
+	connect(this, SIGNAL(transfer()), SLOT(resetTimeout()));
+	
 	new ObjectLog(this,
 		tr("New %1 client: %2").arg(m_type).arg(m_address),
 		tr("%1 client is gone: %2").arg(m_type).arg(m_address));
+		
+	resetTimeout();
 }
 
 QString neteK::ProtocolHandler::me() const
@@ -39,6 +47,17 @@ QString neteK::ProtocolHandler::me() const
 void neteK::ProtocolHandler::logAction(QString what) const
 {
 	Application::log()->logLine(QString("(%1) %2").arg(me()).arg(what));
+}
+
+void neteK::ProtocolHandler::resetTimeout()
+{
+	m_network_timeout->start();
+}
+
+void neteK::ProtocolHandler::networkTimeout()
+{
+	logAction(tr("network timeout"));
+	deleteLater();
 }
 
 

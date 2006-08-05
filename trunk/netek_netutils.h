@@ -27,6 +27,7 @@ namespace neteK {
 	const qint64 maxHttpHeaderSize = 100000;
 	const qint64 maxHttpPostSize = 3000000;
 	const qint64 maxFtpLineSize = 10000;
+	const int networkTimeout = 300;
 
 	void resolvePublicAddress(QHostAddress def, QObject *, const char *slot);
 	

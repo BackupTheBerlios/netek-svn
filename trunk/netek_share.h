@@ -30,6 +30,7 @@ class ProtocolHandler: public QObject {
 	
 private:
 	QString m_address, m_type;
+	QPointer<QTimer> m_network_timeout;
 	
 protected:
 	QPointer<Share> m_share;
@@ -41,6 +42,10 @@ protected:
 	
 signals:
 	void transfer();
+	
+private slots:
+	void resetTimeout();
+	void networkTimeout();
 };
 
 class Share: public QObject {

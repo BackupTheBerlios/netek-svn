@@ -365,6 +365,7 @@ void neteK::Log::logLine(QString line)
 		.arg(Application::applicationVersion())
 		.arg(line);
 
+	qDebug() << "LOG:" << txt;
 	emit appendToLog(txt);
 
 	QFile f(m_file);
