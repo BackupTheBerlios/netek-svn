@@ -52,7 +52,8 @@ int main(int argc, char *argv[])
 
 	{
 		QStringList broken;
-		// see Qt task 105055
+		// set Qt tasks 105055, 105708
+		broken.append("4.1.0");
 		broken.append("4.1.1");
 		broken.append("4.1.2");
 		

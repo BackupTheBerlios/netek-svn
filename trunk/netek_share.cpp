@@ -334,7 +334,6 @@ bool neteK::Share::rename(QString who, QString cwd, QString path1, QString path2
 		m_permission == PermissionRW
 		&& filesystemPathNotRoot(cwd, path1, path1)
 		&& filesystemPathNotRoot(cwd, path2, path2)
-		&& !(path2+'/').startsWith(path1+'/') // this prevents Qt from going into infinite loop (TODO: report this to trolltech)
 		&& QFile(path1).rename(path2);
 		
 	if(ret)
