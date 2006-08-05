@@ -1,4 +1,4 @@
-Summary: system tray FTP and webdav server
+Summary: system tray FTP and WebDAV server
 Name: netek
 Version: 0.8.2
 Release: 1
