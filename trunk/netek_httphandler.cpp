@@ -391,7 +391,7 @@ void neteK::HttpHandler::handlePOST()
 	sendErrorResponse(StateSkipContent, 404);
 }
 
-void neteK::HttpHandler::handleGET()
+void neteK::HttpHandler::handleGET(bool head)
 {
 	QFileInfo info;
 	QString ctype, redirect;
@@ -525,7 +525,7 @@ void neteK::HttpHandler::handleGET()
 
 	if(m_download) {
 		QString range = m_request.value("range");
-		if(range.size()) {
+		if(!head && range.size()) {
 			qint64 from, to;
 			bool ok = true;
 			QRegExp rx1("bytes=(\\d+)-(\\d+)"), rx2("bytes=(\\d+)-"), rx3("bytes=-(\\d+)");
@@ -553,10 +553,15 @@ void neteK::HttpHandler::handleGET()
 					}
 				}	
 				return;
-			}
-			
+			}	
 		}
-		sendResponse(StateSkipContent, 200, ctype, m_download->size());
+		
+		if(head) {
+			m_download->deleteLater();
+			m_download = 0;
+			sendResponse(StateSkipContent, 200, ctype);
+		} else
+			sendResponse(StateSkipContent, 200, ctype, m_download->size());
 	} else if(redirect.size())
 		redirectTo(StateSkipContent, redirect);
 	else
@@ -650,8 +655,8 @@ void neteK::HttpHandler::process()
 					}
 					
 					QString method = m_request.method().toUpper();
-					if(method == "GET")
-						handleGET();
+					if(method == "GET" || method == "HEAD")
+						handleGET(method == "HEAD");
 					else if(method == "POST")
 						handlePOST();
 					else
@@ -669,7 +674,7 @@ void neteK::HttpHandler::process()
 			do {
 				if(m_content_left <= 0 || m_buffer.size() >= m_content_left) {
 					if(m_content_left > 0) {
-						qDebug() << "Skipping" << m_content_left;
+						qDebug() << "Skipping" << m_content_left << m_buffer.left(m_content_left);
 						m_buffer.remove(0, m_content_left);
 					}
 					m_content_left = 0;
@@ -677,7 +682,7 @@ void neteK::HttpHandler::process()
 					return;
 				}
 				
-				qDebug() << "Skipping" << m_buffer.size();
+				qDebug() << "Skipping" << m_buffer.size() << m_buffer;
 				
 				m_content_left -= m_buffer.size();
 				m_buffer.clear();

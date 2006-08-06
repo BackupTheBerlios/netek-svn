@@ -58,7 +58,7 @@ class HttpHandler: public ProtocolHandler {
 	bool sendErrorResponse(State nstate, int code, QString description = "");
 	bool redirectTo(State nstate, QString loc);
 	
-	void handleGET();
+	void handleGET(bool head);
 	void handlePOST();
 
 	bool read();
