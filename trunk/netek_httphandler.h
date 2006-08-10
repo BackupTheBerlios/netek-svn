@@ -40,7 +40,7 @@ class HttpHandler: public ProtocolHandler {
 	QByteArray m_post_upload_next_boundary, m_post_upload_last_boundary;
 
 	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateUrlencodedPost,
-		StateMultipartUpload, StateMultipartUploadBody, StateHandleActionPost };
+		StateMultipartUpload, StateMultipartUploadBody, StateHandleActionPost, StatePutFile };
 	State m_state, m_state_after_urlencodedpost;
 	
 	QUrl m_urlencodedpost;
@@ -55,15 +55,18 @@ class HttpHandler: public ProtocolHandler {
 	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
 	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
 	bool sendPartialResponse(State nstate, QString content_type, qint64 full_size, qint64 from, qint64 to);
-	bool sendOptionsResponse(State nstate, QString allow);
+	bool sendOptionsResponse(State nstate, int code, QString allow);
+	bool sendCreatedResponse(State nstate, QString loc);
 	bool sendErrorResponse(State nstate, int code, QString description = "");
 	bool redirectTo(State nstate, QString loc);
 
 	enum GetLike { GET, HEAD, OPTIONS };
 	bool isGetLike(QString method, GetLike *g = 0);
 	
-	void handleGetLike(GetLike g);
-	void handlePOST();
+	bool handleGetLike(GetLike g);
+	bool handlePOST();
+	bool handleMKCOL();
+	bool handlePUT();
 
 	bool read();
 	bool send(const char *buf, qint64 size);
@@ -73,6 +76,7 @@ class HttpHandler: public ProtocolHandler {
 	
 	bool bufferMustContain(int &pos, const QByteArray &a, int from = 0);
 	int doesBufferContain(const QByteArray &a, int from = 0);
+	QString getLocation(QString path = "");
 
 	static QString getMimeType(QString name);
 

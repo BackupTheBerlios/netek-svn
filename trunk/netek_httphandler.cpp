@@ -21,8 +21,10 @@
 #include "netek_mimetype.h"
 
 // TODO: check html & css with validator
-// TODO: implement HEAD
 // TODO: implement caching
+// TODO: test PUT
+// TODO: verify HTTP/1.1 method specs
+// TODO: content-* headers
 
 static const char g_content_type_html[] = "text/html; charset=utf-8";
 
@@ -270,6 +272,15 @@ bool neteK::HttpHandler::sendResponse(State nstate, int code, QString ct, qint64
 	return sendResponse_(nstate, response);
 }
 
+bool neteK::HttpHandler::sendCreatedResponse(State nstate, QString loc)
+{
+	QHttpResponseHeader response;
+	initResponse_(response, 201);
+	response.addValue("Location", loc);
+	response.addValue("Content-Length", "0");
+	return sendResponse_(nstate, response);
+}
+
 bool neteK::HttpHandler::sendPartialResponse(State nstate, QString ct, qint64 full, qint64 from, qint64 to)
 {
 	QHttpResponseHeader response;
@@ -281,10 +292,10 @@ bool neteK::HttpHandler::sendPartialResponse(State nstate, QString ct, qint64 fu
 	return sendResponse_(nstate, response);
 }
 
-bool neteK::HttpHandler::sendOptionsResponse(State nstate, QString allow)
+bool neteK::HttpHandler::sendOptionsResponse(State nstate, int code, QString allow)
 {
 	QHttpResponseHeader response;
-	initResponse_(response, 200);
+	initResponse_(response, code);
 	response.addValue("Content-Length", "0");
 	response.addValue("Allow", allow);
 	return sendResponse_(nstate, response);
@@ -377,7 +388,7 @@ void neteK::HttpHandler::terminate()
 		m_sock->close();
 }
 
-void neteK::HttpHandler::handlePOST()
+bool neteK::HttpHandler::handlePOST()
 {
 	QRegExp uploadrx("(.*/)upload");
 	if(uploadrx.exactMatch(m_request_url.path())) {
@@ -389,41 +400,40 @@ void neteK::HttpHandler::handlePOST()
 			m_post_upload_next_boundary = "--" + values.value("boundary").toUtf8() + "\r\n";
 			m_post_upload_last_boundary = "\r\n--" + values.value("boundary").toUtf8() + "--\r\n";
 			changeState(StateMultipartUpload);
+			return true;
 		} else {
-			sendErrorResponse(StateSkipContent, 400, "multipart/form-data with boundary expected.");
+			return sendErrorResponse(StateSkipContent, 400, "multipart/form-data with boundary expected.");
 		}
-		return;
 	}
 	
 	QRegExp actionrx("(.*/)action");
 	if(actionrx.exactMatch(m_request_url.path())) {
 		m_post_action_dir = actionrx.cap(1);
 		handleUrlencodedPost(StateHandleActionPost);
-		return;
+		return true;
 	}
 	
-	sendErrorResponse(StateSkipContent, 404);
+	return sendErrorResponse(StateSkipContent, 404);
 }
 
-void neteK::HttpHandler::handleGetLike(GetLike method)
+bool neteK::HttpHandler::handleGetLike(GetLike method)
 {
-	if(method == OPTIONS && m_request_url.path() == "*") {
-		sendOptionsResponse(StateSkipContent, g_options_general);
-		return;
-	}
+	if(method == OPTIONS && m_request_url.path() == "*")
+		return sendOptionsResponse(StateSkipContent, 200, g_options_general);
 	
 	QFileInfo info;
-	QString ctype, redirect;
+	QString ctype;
 	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
 		if(info.isDir()) {
 			if(!m_request_url.path().endsWith('/')) {
-				redirect = m_request_url.path() + '/';
+				return redirectTo(StateSkipContent, getLocation(m_request_url.path() + '/'));
 			} else if(method == OPTIONS) {
-				sendOptionsResponse(StateSkipContent, g_options_directory);
-				return;
+				return sendOptionsResponse(StateSkipContent, 200, g_options_directory);
 			} else {
 				QFileInfoList infos;
 				if(m_share->listFolder(m_cwd, m_request_url.path(), infos)) {
+					if(m_download)
+						m_download->deleteLater();
 					m_download = new QBuffer(this);
 					m_download->open(QIODevice::ReadWrite);
 
@@ -539,21 +549,19 @@ void neteK::HttpHandler::handleGetLike(GetLike method)
 				}
 			}
 		} else if(info.isFile()) {
-			if(method == OPTIONS) {
-				sendOptionsResponse(StateSkipContent, g_options_file);
-				return;
-			}
+			if(method == OPTIONS)
+				return sendOptionsResponse(StateSkipContent, 200, g_options_file);
 			
+			if(m_download)
+				m_download->deleteLater();
 			m_download = m_share->readFile(me(), m_cwd, m_request_url.path());
 			m_download->setParent(this);
 			ctype = getMimeType(info.fileName());
 		} else if(method == OPTIONS) {
-			sendErrorResponse(StateSkipContent, 503, "Unknown type of file.");
-			return;
+			return sendErrorResponse(StateSkipContent, 503, "Unknown type of file.");
 		}
 	} else if(method == OPTIONS) {
-		sendOptionsResponse(StateSkipContent, g_options_nonexistant);
-		return;
+		return sendOptionsResponse(StateSkipContent, 200, g_options_nonexistant);
 	}
 
 	if(m_download) {
@@ -575,31 +583,72 @@ void neteK::HttpHandler::handleGetLike(GetLike method)
 				ok = false;
 				
 			if(ok) {
-				if(from < 0 || to < from || to >= m_download->size())
-					sendResponse(StateSkipContent, 416);
-				else {
-					if(!m_download->seek(from)) {
-						sendErrorResponse(StateSkipContent, 503, QString("Could not skip first %1 bytes in response.").arg(from));
-					} else {
-						m_limit_response_content = to-from+1;
-						sendPartialResponse(StateSkipContent, ctype, m_download->size(), from, to);
-					}
-				}	
-				return;
+				if(from < 0 || to < from || to >= m_download->size()) {
+					m_download->deleteLater();
+					m_download = 0;
+					return sendResponse(StateSkipContent, 416);
+				}
+
+				if(!m_download->seek(from))
+					return sendErrorResponse(StateSkipContent, 503, QString("Could not skip first %1 bytes in response.").arg(from));
+				
+				m_limit_response_content = to-from+1;
+				return sendPartialResponse(StateSkipContent, ctype, m_download->size(), from, to);
 			}	
 		}
 		
-		if(method == GET) {
-			sendResponse(StateSkipContent, 200, ctype, m_download->size());
-		} else {
-			m_download->deleteLater();
-			m_download = 0;
-			sendResponse(StateSkipContent, 200, ctype);
-		}
-	} else if(redirect.size())
-		redirectTo(StateSkipContent, redirect);
-	else
-		sendErrorResponse(StateSkipContent, 404);
+		if(method == GET)
+			return sendResponse(StateSkipContent, 200, ctype, m_download->size());
+		
+		m_download->deleteLater();
+		m_download = 0;
+		return sendResponse(StateSkipContent, 200, ctype);
+	}
+	
+	return sendErrorResponse(StateSkipContent, 404);
+}
+
+bool neteK::HttpHandler::handlePUT()
+{
+	if(m_download)
+		m_download->deleteLater();
+	m_download = m_share->writeFile(me(), m_cwd, m_request_url.path());
+	if(m_download) {
+		changeState(StatePutFile);
+		return true;
+	}
+	
+	QFileInfo info;
+	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+		if(info.isDir())
+			return sendOptionsResponse(StateSkipContent, 405, g_options_directory);
+	}
+	
+	QString parent;
+	if(m_share->parentPath(m_cwd, m_request_url.path(), parent) && m_share->fileInformation(m_cwd, parent, info))
+		return sendErrorResponse(StateSkipContent, 403);
+	
+	return sendErrorResponse(StateSkipContent, 409);
+}
+
+bool neteK::HttpHandler::handleMKCOL()
+{
+	if(m_share->createFolder(me(), m_cwd, m_request_url.path()))
+		return sendCreatedResponse(StateSkipContent, getLocation(m_request_url.path()));
+		
+	QFileInfo info;
+	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+		if(info.isDir())
+			return sendOptionsResponse(StateSkipContent, 405, g_options_directory);
+		else if(info.isFile())
+			return sendOptionsResponse(StateSkipContent, 405, g_options_file);
+	}
+	
+	QString parent;
+	if(m_share->parentPath(m_cwd, m_request_url.path(), parent) && m_share->fileInformation(m_cwd, parent, info))
+		return sendErrorResponse(StateSkipContent, 403);
+	
+	return sendErrorResponse(StateSkipContent, 409);
 }
 
 void neteK::HttpHandler::process()
@@ -614,7 +663,9 @@ void neteK::HttpHandler::process()
 	
 	if(m_upload) {
 		switch(m_state) {
-			case StateMultipartUploadBody: break;
+			case StateMultipartUploadBody:
+			case StatePutFile:
+				break;
 			default:
 				qDebug() << "Closing upload";
 				m_upload->deleteLater();
@@ -693,6 +744,10 @@ void neteK::HttpHandler::process()
 					GetLike glike;
 					if(isGetLike(method, &glike))
 						handleGetLike(glike);
+					else if(method == "PUT")
+						handlePUT();
+					else if(method == "MKCOL")
+						handleMKCOL();
 					else if(method == "POST")
 						handlePOST();
 					else
@@ -866,7 +921,7 @@ void neteK::HttpHandler::process()
 						return;
 					}
 					
-					redirectTo(StateSkipContent, m_post_upload_dir);
+					redirectTo(StateSkipContent, getLocation(m_post_upload_dir));
 					return;
 				}
 				
@@ -897,7 +952,7 @@ void neteK::HttpHandler::process()
 			
 			break;
 			
-		case StateHandleActionPost:
+		case StateHandleActionPost: {
 			qDebug() << "StateHandleActionPost";
 			m_post_action_delete_ok = true;
 			
@@ -911,7 +966,46 @@ void neteK::HttpHandler::process()
 			}
 			
 			if(m_post_action_delete == 0)
-				redirectTo(StateSkipContent, m_post_action_dir);
+				redirectTo(StateSkipContent, getLocation(m_post_action_dir));
+			break; }
+			
+		case StatePutFile:
+			qDebug() << "StatePutFile" << m_content_left;
+			for(;;) {
+				if(m_content_left <= 0) {
+					m_content_left = 0;
+					sendCreatedResponse(StateSkipContent, getLocation(m_request_url.path()));
+					return;
+				}
+				
+				if(m_buffer.size()) {
+					qint64 wr = qMin(qint64(m_buffer.size()), m_content_left);
+					if(m_upload && wr != m_upload->write(m_buffer.data(), wr)) {
+						sendErrorResponse(StateSkipContent, 503, "Error writing to file.");
+						return;
+					}
+					m_buffer.remove(0, wr);
+					m_content_left -= wr;
+				} else {
+					char buf[networkBufferSize];
+					qint64 ret = m_sock->read(buf, sizeof(buf));
+					if(ret < 0) {
+						terminate();
+						return;
+					} else if(ret > 0) {
+						qint64 wr = qMin(ret, m_content_left);
+						if(wr == m_content_left)
+							m_buffer.append(QByteArray(buf+wr, ret-wr));
+						m_content_left -= wr;
+						if(m_upload && wr != m_upload->write(buf, wr)) {
+							sendErrorResponse(StateSkipContent, 503, "Error writing to file.");
+							return;
+						}
+					} else
+						break;
+				}
+			}
+			
 			break;
 	}
 }
@@ -923,7 +1017,7 @@ void neteK::HttpHandler::actionDeleteDone(bool ok)
 	
 	if(--m_post_action_delete == 0) {
 		if(m_post_action_delete_ok)
-			redirectTo(StateSkipContent, m_post_action_dir);
+			redirectTo(StateSkipContent, getLocation(m_post_action_dir));
 		else
 			sendErrorResponse(StateSkipContent, 503, "Some files could not be deleted.");
 	}
@@ -935,6 +1029,17 @@ int neteK::HttpHandler::doesBufferContain(const QByteArray &a, int from)
 	if(pos != 1 && pos + a.size() > m_content_left)
 		pos = -1;
 	return pos;
+}
+
+QString neteK::HttpHandler::getLocation(QString path)
+{
+	QUrl url;
+	if(m_request.isValid()) {
+		url.setScheme("http");
+		url.setAuthority(m_request.value("host"));
+	}
+	url.setPath(path);
+	return url.toString();
 }
 
 void neteK::HttpHandler::writeHtmlEscaped(QIODevice *d, QString s)

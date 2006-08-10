@@ -482,7 +482,22 @@ QFile *neteK::Share::changeAttributes(QString who, QString cwd, QString path) co
 	return ret;
 }
 
-bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) const
+bool neteK::Share::parentPath(QString cwd, QString path, QString &resolved)
+{
+	if(resolvePath(cwd, path, resolved)) {
+		int pos = resolved.lastIndexOf('/');
+		if(pos != -1) {
+			resolved.truncate(pos);
+			if(resolved.isEmpty())
+				resolved = '/';
+			qDebug() << "=== Parent path:" << resolved;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved)
 {
 	cwd.replace('\\', '/');
 	path.replace('\\', '/');
@@ -493,7 +508,7 @@ bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved) con
 	QStringList current;
 	QStringList change = path.split('/');
 	foreach(QString c, change)
-		if(c == "." || c == "")
+		if(c == "." || c.isEmpty())
 			;
 		else if(c == "..") {
 			if(current.size() == 0)

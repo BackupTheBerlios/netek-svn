@@ -120,8 +120,8 @@ class Share: public QObject {
 		bool deleteFolder(QString who, QString cwd, QString path) const;
 		QFile *changeAttributes(QString who, QString cwd, QString path) const;
 		
-		bool resolvePath(QString cwd, QString path, QString &resolved) const;
-		bool parentPath(QString cwd, QString path, QString &resolved) const;
+		static bool resolvePath(QString cwd, QString path, QString &resolved);
+		static bool parentPath(QString cwd, QString path, QString &resolved);
 
 	private:
 		QString m_folder;
