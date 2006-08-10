@@ -66,7 +66,7 @@ int main(int argc, char *argv[])
 
 	neteK::Gui gui;
 
-	gui.show();
+	//gui.show();
 
 	return app.exec();
 }

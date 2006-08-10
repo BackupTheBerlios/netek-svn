@@ -55,10 +55,14 @@ class HttpHandler: public ProtocolHandler {
 	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
 	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
 	bool sendPartialResponse(State nstate, QString content_type, qint64 full_size, qint64 from, qint64 to);
+	bool sendOptionsResponse(State nstate, QString allow);
 	bool sendErrorResponse(State nstate, int code, QString description = "");
 	bool redirectTo(State nstate, QString loc);
+
+	enum GetLike { GET, HEAD, OPTIONS };
+	bool isGetLike(QString method, GetLike *g = 0);
 	
-	void handleGET(bool head);
+	void handleGetLike(GetLike g);
 	void handlePOST();
 
 	bool read();

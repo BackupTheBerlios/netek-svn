@@ -121,6 +121,7 @@ class Share: public QObject {
 		QFile *changeAttributes(QString who, QString cwd, QString path) const;
 		
 		bool resolvePath(QString cwd, QString path, QString &resolved) const;
+		bool parentPath(QString cwd, QString path, QString &resolved) const;
 
 	private:
 		QString m_folder;

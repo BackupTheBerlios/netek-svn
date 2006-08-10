@@ -186,6 +186,11 @@ static const char g_js_filetable[] =
 "filetable(document.body);"
 "</script>";
 
+static const char *g_options_general = "GET,HEAD,POST,OPTIONS";
+static const char *g_options_nonexistant = "OPTIONS,MKCOL,PUT";
+static const char *g_options_directory = "OPTIONS,GET,HEAD,DELETE,PROPFIND,PROPPATCH,COPY,MOVE";
+static const char *g_options_file = "OPTIONS,GET,HEAD,DELETE,PROPFIND,PROPPATCH,COPY,MOVE,PUT";
+
 neteK::HttpHandler::HttpHandler(Share *s, QAbstractSocket *sock)
 : ProtocolHandler(s, "HTTP", sock->peerAddress()), m_cwd("/"), m_sock(sock), m_state(StateHeader), m_post_action_delete(0)
 {
@@ -209,7 +214,7 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 
 	int major = 1, minor = 1;
 	m_connection_close = false;
-	bool get_like = false;
+	bool request_get = false;
 	
 	if(m_request.isValid()) {
 		if(HTTP_LESS(m_request.majorVersion(), m_request.minorVersion(), major, minor)) {
@@ -219,10 +224,10 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 
 		if(m_request.value("connection").toLower() == "close")
 			m_connection_close = true;
-			
-		QString method = m_request.method().toUpper();
-		if(method == "GET" || method == "HEAD")
-			get_like = true;
+		
+		GetLike g;
+		if(isGetLike(m_request.method(), &g) && (g == GET || g == HEAD))
+			request_get = true;
 	}
 
 	if(HTTP_LESS(major, minor, 1, 1))
@@ -232,7 +237,7 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 	response.addValue("Server", qApp->applicationName());
 	response.addValue("Connection", m_connection_close ? "Close" : "Keep-Alive");
 	
-	if(code == 206 || code == 416 || code / 100 == 2 && get_like)
+	if(code == 206 || code == 416 || code / 100 == 2 && request_get)
 		response.addValue("Accept-Ranges", "bytes");
 
 #undef HTTP_LESS
@@ -273,6 +278,15 @@ bool neteK::HttpHandler::sendPartialResponse(State nstate, QString ct, qint64 fu
 		response.addValue("Content-Type", ct);
 	response.addValue("Content-Length", QString::number(to-from+1));
 	response.addValue("Content-Range", QString("bytes %1-%2/%3").arg(from).arg(to).arg(full));
+	return sendResponse_(nstate, response);
+}
+
+bool neteK::HttpHandler::sendOptionsResponse(State nstate, QString allow)
+{
+	QHttpResponseHeader response;
+	initResponse_(response, 200);
+	response.addValue("Content-Length", "0");
+	response.addValue("Allow", allow);
 	return sendResponse_(nstate, response);
 }
 
@@ -391,14 +405,22 @@ void neteK::HttpHandler::handlePOST()
 	sendErrorResponse(StateSkipContent, 404);
 }
 
-void neteK::HttpHandler::handleGET(bool head)
+void neteK::HttpHandler::handleGetLike(GetLike method)
 {
+	if(method == OPTIONS && m_request_url.path() == "*") {
+		sendOptionsResponse(StateSkipContent, g_options_general);
+		return;
+	}
+	
 	QFileInfo info;
 	QString ctype, redirect;
 	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
 		if(info.isDir()) {
 			if(!m_request_url.path().endsWith('/')) {
 				redirect = m_request_url.path() + '/';
+			} else if(method == OPTIONS) {
+				sendOptionsResponse(StateSkipContent, g_options_directory);
+				return;
 			} else {
 				QFileInfoList infos;
 				if(m_share->listFolder(m_cwd, m_request_url.path(), infos)) {
@@ -517,15 +539,26 @@ void neteK::HttpHandler::handleGET(bool head)
 				}
 			}
 		} else if(info.isFile()) {
+			if(method == OPTIONS) {
+				sendOptionsResponse(StateSkipContent, g_options_file);
+				return;
+			}
+			
 			m_download = m_share->readFile(me(), m_cwd, m_request_url.path());
 			m_download->setParent(this);
 			ctype = getMimeType(info.fileName());
+		} else if(method == OPTIONS) {
+			sendErrorResponse(StateSkipContent, 503, "Unknown type of file.");
+			return;
 		}
+	} else if(method == OPTIONS) {
+		sendOptionsResponse(StateSkipContent, g_options_nonexistant);
+		return;
 	}
 
 	if(m_download) {
 		QString range = m_request.value("range");
-		if(!head && range.size()) {
+		if(method == GET && range.size()) {
 			qint64 from, to;
 			bool ok = true;
 			QRegExp rx1("bytes=(\\d+)-(\\d+)"), rx2("bytes=(\\d+)-"), rx3("bytes=-(\\d+)");
@@ -556,12 +589,13 @@ void neteK::HttpHandler::handleGET(bool head)
 			}	
 		}
 		
-		if(head) {
+		if(method == GET) {
+			sendResponse(StateSkipContent, 200, ctype, m_download->size());
+		} else {
 			m_download->deleteLater();
 			m_download = 0;
 			sendResponse(StateSkipContent, 200, ctype);
-		} else
-			sendResponse(StateSkipContent, 200, ctype, m_download->size());
+		}
 	} else if(redirect.size())
 		redirectTo(StateSkipContent, redirect);
 	else
@@ -655,8 +689,10 @@ void neteK::HttpHandler::process()
 					}
 					
 					QString method = m_request.method().toUpper();
-					if(method == "GET" || method == "HEAD")
-						handleGET(method == "HEAD");
+
+					GetLike glike;
+					if(isGetLike(method, &glike))
+						handleGetLike(glike);
 					else if(method == "POST")
 						handlePOST();
 					else
@@ -1001,4 +1037,20 @@ QString neteK::HttpHandler::errorDescription(int code)
 		case 401: return "Authorization failure";
 	}
 	return "Error processing request";
+}
+
+bool neteK::HttpHandler::isGetLike(QString method, GetLike *g)
+{
+	method = method.toUpper();
+	if(method == "GET") {
+		if(g) *g = GET;
+		return true;
+	} else if(method == "HEAD") {
+		if(g) *g = HEAD;
+		return true;
+	} else if(method == "OPTIONS") {
+		if(g) *g = OPTIONS;
+		return true;
+	}
+	return false;
 }
