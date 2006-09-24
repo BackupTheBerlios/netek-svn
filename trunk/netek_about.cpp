@@ -21,6 +21,13 @@
 neteK::About::About()
 {
 	ui.setupUi(this);
+
+	{
+		QFont font = ui.programName->font();
+		font.setBold(true);
+		font.setPointSize(font.pointSize()+2);
+		ui.programName->setFont(font);
+	}
 	
 	ui.programName->setText(QString("%1 %2").arg(qApp->applicationName()).arg(Application::applicationVersion()));
 	ui.programSub->setText(tr("Using Qt %1").arg(qVersion()));

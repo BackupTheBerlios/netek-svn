@@ -449,12 +449,12 @@ void neteK::Gui::sharesChanged()
 				for(int col=1; col<ui.shareList->columnCount(); ++col)
 					item->setTextAlignment(col, Qt::AlignCenter);
 
-				{
+				/*{
 					QFont font = item->font(0);
 					font.setBold(true);
 					for(int col=0; col<ui.shareList->columnCount(); ++col)
 						item->setFont(col, font);
-				}
+				}*/
 
 				ui.shareList->addTopLevelItem(item);
 			}
