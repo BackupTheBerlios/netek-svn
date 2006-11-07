@@ -22,7 +22,6 @@
 
 // TODO: check html & css with validator
 // TODO: implement caching
-// TODO: test PUT
 // TODO: verify HTTP/1.1 method specs
 // TODO: content-* headers
 
@@ -610,17 +609,18 @@ bool neteK::HttpHandler::handleGetLike(GetLike method)
 
 bool neteK::HttpHandler::handlePUT()
 {
-	if(m_download)
-		m_download->deleteLater();
-	m_download = m_share->writeFile(me(), m_cwd, m_request_url.path());
-	if(m_download) {
+
+	if(m_upload)
+		m_upload->deleteLater();
+	m_upload = m_share->writeFile(me(), m_cwd, m_request_url.path());
+	if(m_upload) {
 		changeState(StatePutFile);
 		return true;
 	}
 	
 	QFileInfo info;
 	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
-		if(info.isDir())
+	       	if(info.isDir())
 			return sendOptionsResponse(StateSkipContent, 405, g_options_directory);
 	}
 	

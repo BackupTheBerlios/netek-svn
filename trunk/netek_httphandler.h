@@ -48,7 +48,7 @@ class HttpHandler: public ProtocolHandler {
 	QString m_post_action_dir;
 	bool m_post_action_delete_ok;
 	int m_post_action_delete;
-	
+
 	QPointer<QIODevice> m_download, m_upload;
 
 	void initResponse_(QHttpResponseHeader &h, int code);
