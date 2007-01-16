@@ -26,6 +26,7 @@
 // TODO: content-* headers
 
 static const char g_content_type_html[] = "text/html; charset=utf-8";
+static const char g_content_type_xml[] = "text/xml; charset=utf-8";
 
 static const char g_css[] =
 "<style type=\"text/css\">"
@@ -33,8 +34,9 @@ static const char g_css[] =
 		"background:#fff;"
 		"padding:0;"
 		"margin:0;"
-		"font-size:12pt;"
+		//"font-size:12pt;"
 		"text-align:center;"
+		"font-family:sans-serif;"
 		"color:#000;"
 	"}"
 	".errorb{"
@@ -53,13 +55,13 @@ static const char g_css[] =
 	"}"
 	".title{"
 		"width:100%;"
-		"line-height:28pt;"
+		"padding:6pt 0 6pt 0;"
 		"background:#eee;"
-		"font-size:14pt;"
+		//"font-size:14pt;"
 		"margin-bottom:18pt;"
 	"}"
 	".filetable{"
-		"font-size:12pt;"
+		//"font-size:12pt;"
 		"background:#fff;"
 		"color:#000;"
 		"border-collapse: collapse;"
@@ -193,7 +195,7 @@ static const char *g_options_directory = "OPTIONS,GET,HEAD,DELETE,PROPFIND,PROPP
 static const char *g_options_file = "OPTIONS,GET,HEAD,DELETE,PROPFIND,PROPPATCH,COPY,MOVE,PUT";
 
 neteK::HttpHandler::HttpHandler(Share *s, QAbstractSocket *sock)
-: ProtocolHandler(s, "HTTP", sock->peerAddress()), m_cwd("/"), m_sock(sock), m_state(StateHeader), m_post_action_delete(0)
+: ProtocolHandler(s, "HTTP", sock->peerAddress()), m_sock(sock), m_state(StateHeader), m_post_action_delete(0)
 {
 	m_sock->setParent(this);
 
@@ -209,20 +211,32 @@ neteK::HttpHandler::HttpHandler(Share *s, QAbstractSocket *sock)
 	emit processSignal();
 }
 
-void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
+bool neteK::HttpHandler::httpVersionLess(int x1, int x2, int y1, int y2)
 {
-#define HTTP_LESS(x1, x2, y1, y2) (x1 < y1 || x1 == y1 && x2 < y2)
+	return x1 < y1 || x1 == y1 && x2 < y2;
+}
 
-	int major = 1, minor = 1;
+void neteK::HttpHandler::responseHttpVersion(int &ma, int &mi)
+{
+	ma = 1;
+	mi = 1;
+	if(m_request.isValid()) {
+		if(httpVersionLess(m_request.majorVersion(), m_request.minorVersion(), ma, mi)) {
+			ma = m_request.majorVersion();
+			mi = m_request.minorVersion();
+		}
+	}
+}
+
+void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code, qint64 content_length)
+{
+	int major, minor;
+	responseHttpVersion(major, minor);
+
 	m_connection_close = false;
 	bool request_get = false;
 	
 	if(m_request.isValid()) {
-		if(HTTP_LESS(m_request.majorVersion(), m_request.minorVersion(), major, minor)) {
-			major = m_request.majorVersion();
-			minor = m_request.minorVersion();
-		}
-
 		if(m_request.value("connection").toLower() == "close")
 			m_connection_close = true;
 		
@@ -231,17 +245,19 @@ void neteK::HttpHandler::initResponse_(QHttpResponseHeader &response, int code)
 			request_get = true;
 	}
 
-	if(HTTP_LESS(major, minor, 1, 1))
+	if(httpVersionLess(major, minor, 1, 1))
 		m_connection_close = true;
 
 	response.setStatusLine(code, QString(), 1, 1);
 	response.addValue("Server", qApp->applicationName());
 	response.addValue("Connection", m_connection_close ? "Close" : "Keep-Alive");
+	response.addValue("Content-Length", QString::number(content_length));
 	
 	if(code == 206 || code == 416 || code / 100 == 2 && request_get)
 		response.addValue("Accept-Ranges", "bytes");
 
-#undef HTTP_LESS
+	if(code == 401)
+		response.addValue("WWW-Authenticate", QString("Basic realm=\"%1\"").arg(qApp->applicationName())); // TODO: realm should be user's description
 }
 
 bool neteK::HttpHandler::sendResponse_(State nstate, const QHttpResponseHeader &response)
@@ -262,12 +278,9 @@ bool neteK::HttpHandler::sendResponse_(State nstate, const QHttpResponseHeader &
 bool neteK::HttpHandler::sendResponse(State nstate, int code, QString ct, qint64 cl)
 {
 	QHttpResponseHeader response;
-	initResponse_(response, code);
+	initResponse_(response, code, cl);
 	if(ct.size())
 		response.addValue("Content-Type", ct);
-	response.addValue("Content-Length", QString::number(cl));
-	if(code == 401)
-		response.addValue("WWW-Authenticate", QString("Basic realm=\"%1\"").arg(qApp->applicationName())); // TODO: realm should be user's description
 	return sendResponse_(nstate, response);
 }
 
@@ -276,17 +289,22 @@ bool neteK::HttpHandler::sendCreatedResponse(State nstate, QString loc)
 	QHttpResponseHeader response;
 	initResponse_(response, 201);
 	response.addValue("Location", loc);
-	response.addValue("Content-Length", "0");
+	return sendResponse_(nstate, response);
+}
+
+bool neteK::HttpHandler::sendNoContentResponse(State nstate)
+{
+	QHttpResponseHeader response;
+	initResponse_(response, 204);
 	return sendResponse_(nstate, response);
 }
 
 bool neteK::HttpHandler::sendPartialResponse(State nstate, QString ct, qint64 full, qint64 from, qint64 to)
 {
 	QHttpResponseHeader response;
-	initResponse_(response, 206);
+	initResponse_(response, 206, to-from+1);
 	if(ct.size())
 		response.addValue("Content-Type", ct);
-	response.addValue("Content-Length", QString::number(to-from+1));
 	response.addValue("Content-Range", QString("bytes %1-%2/%3").arg(from).arg(to).arg(full));
 	return sendResponse_(nstate, response);
 }
@@ -295,7 +313,6 @@ bool neteK::HttpHandler::sendOptionsResponse(State nstate, int code, QString all
 {
 	QHttpResponseHeader response;
 	initResponse_(response, code);
-	response.addValue("Content-Length", "0");
 	response.addValue("Allow", allow);
 	return sendResponse_(nstate, response);
 }
@@ -329,7 +346,6 @@ bool neteK::HttpHandler::redirectTo(State nstate, QString loc)
 	QHttpResponseHeader response;
 	initResponse_(response, 303);
 	response.addValue("Location", loc);
-	response.addValue("Content-Length", "0");
 	return sendResponse_(nstate, response);
 }
 
@@ -381,7 +397,7 @@ void neteK::HttpHandler::handleUrlencodedPost(State next)
 
 void neteK::HttpHandler::terminate()
 {
-	changeState(StateNone);
+	changeState(StateIgnore);
 
 	if(m_sock)
 		m_sock->close();
@@ -422,7 +438,7 @@ bool neteK::HttpHandler::handleGetLike(GetLike method)
 	
 	QFileInfo info;
 	QString ctype;
-	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+	if(m_share->fileInformation(Share::root(), m_request_url.path(), info)) {
 		if(info.isDir()) {
 			if(!m_request_url.path().endsWith('/')) {
 				return redirectTo(StateSkipContent, getLocation(m_request_url.path() + '/'));
@@ -430,7 +446,7 @@ bool neteK::HttpHandler::handleGetLike(GetLike method)
 				return sendOptionsResponse(StateSkipContent, 200, g_options_directory);
 			} else {
 				QFileInfoList infos;
-				if(m_share->listFolder(m_cwd, m_request_url.path(), infos)) {
+				if(m_share->listFolder(Share::root(), m_request_url.path(), infos)) {
 					if(m_download)
 						m_download->deleteLater();
 					m_download = new QBuffer(this);
@@ -553,7 +569,7 @@ bool neteK::HttpHandler::handleGetLike(GetLike method)
 			
 			if(m_download)
 				m_download->deleteLater();
-			m_download = m_share->readFile(me(), m_cwd, m_request_url.path());
+			m_download = m_share->readFile(me(), Share::root(), m_request_url.path());
 			m_download->setParent(this);
 			ctype = getMimeType(info.fileName());
 		} else if(method == OPTIONS) {
@@ -609,23 +625,23 @@ bool neteK::HttpHandler::handleGetLike(GetLike method)
 
 bool neteK::HttpHandler::handlePUT()
 {
-
 	if(m_upload)
 		m_upload->deleteLater();
-	m_upload = m_share->writeFile(me(), m_cwd, m_request_url.path());
+	m_upload = m_share->writeFile(me(), Share::root(), m_request_url.path());
 	if(m_upload) {
 		changeState(StatePutFile);
 		return true;
 	}
 	
 	QFileInfo info;
-	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+	if(m_share->fileInformation(Share::root(), m_request_url.path(), info)) {
 	       	if(info.isDir())
 			return sendOptionsResponse(StateSkipContent, 405, g_options_directory);
 	}
 	
 	QString parent;
-	if(m_share->parentPath(m_cwd, m_request_url.path(), parent) && m_share->fileInformation(m_cwd, parent, info))
+	if(m_share->parentPath(Share::root(), m_request_url.path(), parent)
+		&& m_share->fileInformation(Share::root(), parent, info))
 		return sendErrorResponse(StateSkipContent, 403);
 	
 	return sendErrorResponse(StateSkipContent, 409);
@@ -633,11 +649,11 @@ bool neteK::HttpHandler::handlePUT()
 
 bool neteK::HttpHandler::handleMKCOL()
 {
-	if(m_share->createFolder(me(), m_cwd, m_request_url.path()))
+	if(m_share->createFolder(me(), Share::root(), m_request_url.path()))
 		return sendCreatedResponse(StateSkipContent, getLocation(m_request_url.path()));
 		
 	QFileInfo info;
-	if(m_share->fileInformation(m_cwd, m_request_url.path(), info)) {
+	if(m_share->fileInformation(Share::root(), m_request_url.path(), info)) {
 		if(info.isDir())
 			return sendOptionsResponse(StateSkipContent, 405, g_options_directory);
 		else if(info.isFile())
@@ -645,10 +661,198 @@ bool neteK::HttpHandler::handleMKCOL()
 	}
 	
 	QString parent;
-	if(m_share->parentPath(m_cwd, m_request_url.path(), parent) && m_share->fileInformation(m_cwd, parent, info))
+	if(m_share->parentPath(Share::root(), m_request_url.path(), parent) && m_share->fileInformation(Share::root(), parent, info))
 		return sendErrorResponse(StateSkipContent, 403);
 	
 	return sendErrorResponse(StateSkipContent, 409);
+}
+
+int neteK::HttpHandler::depth()
+{
+	if(m_request.isValid()) {
+		QString d = m_request.value("depth").toLower();
+		if(d.isEmpty() || d == "infinity")
+			return -1;
+		bool ok;
+		int num = d.toInt(&ok);
+		if(ok)
+			return num;
+	}
+	return -2;
+}
+
+bool neteK::HttpHandler::overwrite()
+{
+	if(m_request.isValid()) {
+		QString o = m_request.value("overwrite").toLower();
+		if(o.isEmpty() || o == "t")
+			return true;
+	}
+	return false;
+}
+
+bool neteK::HttpHandler::sendInvalidDepth(State nstate)
+{
+	return sendErrorResponse(nstate, 400, QString("Invalid depth %1.").arg(m_request.value("depth")));
+}
+
+bool neteK::HttpHandler::handleDELETE()
+{
+	if(depth() != -1)
+		return sendInvalidDepth(StateSkipContent);
+
+	QFileInfo info;
+	if(!m_share->fileInformation(Share::root(), m_request_url.path(), info))
+		return sendErrorResponse(StateSkipContent, 404);
+
+	RecursiveDelete *d = new RecursiveDelete(this, me(), m_share, Share::root(), m_request_url.path());
+	connect(d, SIGNAL(done(bool)), SLOT(methodDeleteDone()));
+	connect(d, SIGNAL(error(QString)), SLOT(addMultiStatusForbiddenLocation(QString)));
+	
+	changeState(StateIgnore);
+
+	return true;
+}
+
+namespace neteK {
+
+	class WebDAVCopy: public QObject {
+		Q_OBJECT;
+
+		QString m_who;
+		QPointer<Share> m_share;
+		QString m_from, m_to;
+		int m_depth;
+		bool m_done;
+
+	public:
+		WebDAVCopy(QObject *parent, QString who, Share *share, QString from, QString to, int depth, bool del_first)
+			: QObject(parent), m_who(who), m_share(share), m_from(from), m_to(to), m_depth(depth), m_done(false)
+		{
+			if(del_first) {
+				RecursiveDelete *d = new RecursiveDelete(this, m_who, m_share, Share::root(), m_to);
+				connect(d, SIGNAL(done(bool)), SLOT(startCopy(bool)));
+				connect(d, SIGNAL(error(QString)), SIGNAL(error(QString)));
+			} else
+				startCopy(true);
+		}
+
+		~WebDAVCopy()
+		{
+			if(m_done)
+				emit done(m_to);
+		}
+
+	private slots:
+		void copyDone()
+		{
+			if(!m_done) {
+				m_done = true;
+				deleteLater();
+			}
+		}
+
+		void startCopy(bool del_ok)
+		{
+			if(!del_ok) {
+				if(!m_done) {
+					m_done = true;
+					deleteLater();
+				}
+				return;
+			}
+
+			RecursiveCopy *c = new RecursiveCopy(this, m_who, m_share, Share::root(), m_from, m_to, m_depth);
+			connect(c, SIGNAL(done(bool)), SLOT(copyDone()));
+			connect(c, SIGNAL(error(QString)), SIGNAL(error(QString)));
+		}
+
+	signals:
+		void error(QString);
+		void done(QString);
+	};
+}
+
+bool neteK::HttpHandler::handleCOPY()
+{
+	int d = depth();
+	if(d < -1)
+		return sendInvalidDepth(StateSkipContent);
+
+	QString from, to;
+	if(!getDestination(to)
+		|| !Share::resolvePath(Share::root(), m_request_url.path(), from)
+		|| !Share::resolvePath(Share::root(), to, to)
+		|| from == to)
+		return sendErrorResponse(StateSkipContent, 403);
+
+	QFileInfo info;
+	if(!m_share->fileInformation(Share::root(), from, info))
+		return sendErrorResponse(StateSkipContent, 404);
+
+	bool del_first = false;
+	if(m_share->fileInformation(Share::root(), to, info)) {
+		if(!overwrite())
+			return sendErrorResponse(StateSkipContent, 412);
+		del_first = true;
+	}
+
+	WebDAVCopy *c = new WebDAVCopy(this, me(), m_share, from, to, d, del_first);
+	connect(c, SIGNAL(done(QString)), SLOT(methodCopyDone(QString)));
+	connect(c, SIGNAL(error(QString)), SLOT(addMultiStatusForbiddenLocation(QString)));
+
+	changeState(StateIgnore);
+
+	return true;
+}
+
+void neteK::HttpHandler::methodCopyDone(QString to)
+{
+	if(m_multi_status.documentElement().hasChildNodes()) {
+		sendMultiStatusResponse(StateSkipContent);
+	} else {
+		sendCreatedResponse(StateSkipContent, getLocation(to));
+	}
+}
+
+void neteK::HttpHandler::methodDeleteDone()
+{
+	if(m_multi_status.documentElement().hasChildNodes()) {
+		sendMultiStatusResponse(StateSkipContent);
+	} else {
+		sendNoContentResponse(StateSkipContent);
+	}
+}
+
+void neteK::HttpHandler::addMultiStatusForbiddenLocation(QString file)
+{
+	addMultiStatusResponse(403, getLocation(file));
+}
+
+bool neteK::HttpHandler::sendMultiStatusResponse(State nstate)
+{
+	if(m_download)
+		m_download->deleteLater();
+	m_download = new QBuffer(this);
+	m_download->open(QIODevice::ReadWrite);
+	m_download->write(m_multi_status.toByteArray());
+	m_download->reset();
+	
+	return sendResponse(nstate, 207, g_content_type_xml, m_download->size());
+}
+
+void neteK::HttpHandler::addMultiStatusResponse(int code, QString loc)
+{
+	QDomElement resp = m_multi_status.createElement("D:response");
+	QDomElement status = m_multi_status.createElement("D:status");
+	QDomElement href = m_multi_status.createElement("D:href");
+	m_multi_status.documentElement().appendChild(resp);
+	resp.appendChild(status);
+	resp.appendChild(href);
+	int ma, mi;
+	responseHttpVersion(ma, mi);
+	status.appendChild(m_multi_status.createTextNode(QString("HTTP/%1.%2 %3").arg(ma).arg(mi).arg(code)));
+	href.appendChild(m_multi_status.createTextNode(loc));
 }
 
 void neteK::HttpHandler::process()
@@ -675,17 +879,23 @@ void neteK::HttpHandler::process()
 		}
 	}
 	
-	if(m_post_action_delete > 0)
-		return;
-
 	switch(m_state) {
-		case StateNone:
-			qDebug() << "StateNone";
+		case StateIgnore:
+			qDebug() << "StateIgnore";
 			break;
 
 		case StateHeader: {
 			qDebug() << "StateHeader";
 			
+			if(!m_multi_status.hasChildNodes() || m_multi_status.documentElement().hasChildNodes()) {
+				m_multi_status = QDomDocument();
+				m_multi_status.appendChild(
+					m_multi_status.createProcessingInstruction("xml", "version=\"1.0\""));
+				QDomElement root = m_multi_status.createElement("D:multistatus");
+				root.setAttribute("xmlns:D", "DAV:");
+				m_multi_status.appendChild(root);
+			}
+
 			m_urlencodedpost.clear();
 			m_limit_response_content = -1;
 			
@@ -748,6 +958,10 @@ void neteK::HttpHandler::process()
 						handlePUT();
 					else if(method == "MKCOL")
 						handleMKCOL();
+					else if(method == "DELETE")
+						handleDELETE();
+					else if(method == "COPY")
+						handleCOPY();
 					else if(method == "POST")
 						handlePOST();
 					else
@@ -850,7 +1064,7 @@ void neteK::HttpHandler::process()
 					m_post_upload_file = data.value("filename");
 					qDebug() << cd << data.value("name") << m_post_upload_file;
 					if(cd == "form-data" && data.value("name") == "file" && m_post_upload_file.size()) {
-						m_upload = m_share->writeFile(me(), m_cwd,
+						m_upload = m_share->writeFile(me(), Share::root(),
 							m_post_upload_dir + m_post_upload_file);
 						if(!m_upload) {
 							sendErrorResponse(StateSkipContent, 503,
@@ -960,13 +1174,15 @@ void neteK::HttpHandler::process()
 			foreach(arg, m_urlencodedpost.queryItems()) {
 				if(arg.first.startsWith("select_") && arg.second.size()) {
 					++m_post_action_delete;
-					connect(new RecursiveDelete(this, me(), m_share, m_cwd, arg.first.mid(7)),
+					connect(new RecursiveDelete(this, me(), m_share, m_post_action_dir, arg.first.mid(7)),
 						SIGNAL(done(bool)), SLOT(actionDeleteDone(bool)));
 				}
 			}
 			
 			if(m_post_action_delete == 0)
 				redirectTo(StateSkipContent, getLocation(m_post_action_dir));
+			else
+				changeState(StateIgnore);
 			break; }
 			
 		case StatePutFile:
@@ -1035,11 +1251,23 @@ QString neteK::HttpHandler::getLocation(QString path)
 {
 	QUrl url;
 	if(m_request.isValid()) {
-		url.setScheme("http");
+		url.setScheme(m_share->URLScheme());
 		url.setAuthority(m_request.value("host"));
 	}
 	url.setPath(path);
 	return url.toString();
+}
+
+bool neteK::HttpHandler::getDestination(QString &path)
+{
+	if(m_request.isValid()) {
+		QUrl url(m_request.value("destination"), QUrl::StrictMode);
+		if(url.scheme() == m_share->URLScheme() && url.authority() == m_request.value("host")) {
+			path = url.path();
+			return true;
+		}
+	}
+	return false;
 }
 
 void neteK::HttpHandler::writeHtmlEscaped(QIODevice *d, QString s)
@@ -1115,7 +1343,7 @@ void neteK::HttpHandler::parseContentType(QString str, QString &ct, QMap<QString
 	str = rx.cap(2);
 	
 	for(;;) {
-		rx.setPattern("; ([^ =]+)=\"([^\"]*)\"(.*)"); // TODO: cleanup after Qt 4.2 is released, Qt 4.1.x regexp greedy is buggy
+		rx.setPattern("; *([^ =]+) *= *\"([^\"]*)\"(.*)");
 		if(rx.exactMatch(str)) {
 			QString &value = values[rx.cap(1)];
 			value = rx.cap(2);
@@ -1124,7 +1352,7 @@ void neteK::HttpHandler::parseContentType(QString str, QString &ct, QMap<QString
 			continue;
 		}
 		
-		rx.setPattern("; ([^ =]+)=([^;]*)(.*)"); // TODO: cleanup after Qt 4.2 is released, Qt 4.1.x regexp greedy is buggy
+		rx.setPattern("; *([^ =]+) *=([^;]*)(.*)");
 		if(rx.exactMatch(str)) {
 			values[rx.cap(1)] = rx.cap(2);
 			str = rx.cap(3);
@@ -1159,3 +1387,5 @@ bool neteK::HttpHandler::isGetLike(QString method, GetLike *g)
 	}
 	return false;
 }
+
+#include "netek_httphandler.moc"
