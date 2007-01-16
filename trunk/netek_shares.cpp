@@ -90,7 +90,7 @@ bool neteK::Shares::deleteShareWithQuestion(int i)
 				QMessageBox::Yes,
 				QMessageBox::No | QMessageBox::Default))
 	{
-		if(-1 != (i == m_shares.indexOf(sh))) {
+		if(-1 != (i = m_shares.indexOf(sh))) {
 			m_shares.removeAt(i);
 			sh->deleteLater();
 			settingsChanged();

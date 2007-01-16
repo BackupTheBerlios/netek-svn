@@ -19,6 +19,7 @@
 #define __NETEK_HTTPHANDLER_H__
 
 #include <QtNetwork>
+#include <QtXml>
 
 #include "netek_share.h"
 
@@ -27,7 +28,6 @@ namespace neteK {
 class HttpHandler: public ProtocolHandler {
 	Q_OBJECT;
 
-	QString m_cwd;
 	QPointer<QAbstractSocket> m_sock;
 	QByteArray m_buffer;
 	QHttpRequestHeader m_request;
@@ -39,7 +39,7 @@ class HttpHandler: public ProtocolHandler {
 	QString m_post_upload_file;
 	QByteArray m_post_upload_next_boundary, m_post_upload_last_boundary;
 
-	enum State { StateNone, StateHeader, StateSkipContent, StateDownload, StateUrlencodedPost,
+	enum State { StateIgnore, StateHeader, StateSkipContent, StateDownload, StateUrlencodedPost,
 		StateMultipartUpload, StateMultipartUploadBody, StateHandleActionPost, StatePutFile };
 	State m_state, m_state_after_urlencodedpost;
 	
@@ -51,14 +51,22 @@ class HttpHandler: public ProtocolHandler {
 
 	QPointer<QIODevice> m_download, m_upload;
 
-	void initResponse_(QHttpResponseHeader &h, int code);
+	QDomDocument m_multi_status;
+	void addMultiStatusResponse(int code, QString loc);
+
+	static bool httpVersionLess(int x1, int x2, int y1, int y2);
+	void responseHttpVersion(int &ma, int &mi);
+	void initResponse_(QHttpResponseHeader &h, int code, qint64 content_length = 0);
 	bool sendResponse_(State nstate, const QHttpResponseHeader &h);
 	bool sendResponse(State nstate, int code, QString content_type = QString(), qint64 content_length = 0);
 	bool sendPartialResponse(State nstate, QString content_type, qint64 full_size, qint64 from, qint64 to);
 	bool sendOptionsResponse(State nstate, int code, QString allow);
 	bool sendCreatedResponse(State nstate, QString loc);
+	bool sendNoContentResponse(State nstate);
 	bool sendErrorResponse(State nstate, int code, QString description = "");
+	bool sendInvalidDepth(State nstate);
 	bool redirectTo(State nstate, QString loc);
+	bool sendMultiStatusResponse(State nstate);
 
 	enum GetLike { GET, HEAD, OPTIONS };
 	bool isGetLike(QString method, GetLike *g = 0);
@@ -67,6 +75,9 @@ class HttpHandler: public ProtocolHandler {
 	bool handlePOST();
 	bool handleMKCOL();
 	bool handlePUT();
+	bool handleCOPY();
+	bool handleMOVE();
+	bool handleDELETE();
 
 	bool read();
 	bool send(const char *buf, qint64 size);
@@ -77,6 +88,9 @@ class HttpHandler: public ProtocolHandler {
 	bool bufferMustContain(int &pos, const QByteArray &a, int from = 0);
 	int doesBufferContain(const QByteArray &a, int from = 0);
 	QString getLocation(QString path = "");
+	int depth();
+	bool overwrite();
+	bool getDestination(QString &path);
 
 	static QString getMimeType(QString name);
 
@@ -99,6 +113,10 @@ signals:
 private slots:
 	void process();
 	void actionDeleteDone(bool ok);
+
+	void addMultiStatusForbiddenLocation(QString);
+	void methodDeleteDone();
+	void methodCopyDone(QString);
 	
 public:
 	HttpHandler(Share *s, QAbstractSocket *sock);

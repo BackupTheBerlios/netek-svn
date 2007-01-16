@@ -115,6 +115,7 @@ class Share: public QObject {
 		QFile *readFile(QString who, QString cwd, QString path, qint64 pos = 0) const;
 		QFile *writeFile(QString who, QString cwd, QString path, bool append = false) const;
 		QFile *writeFileUnique(QString who, QString cwd, QString &name) const;
+		bool copyFile(QString who, QString cwd, QString path, QString path2, QFile *&rf, QFile *&wf) const;
 		bool deleteFile(QString who, QString cwd, QString path) const;
 		bool createFolder(QString who, QString cwd, QString path) const;
 		bool deleteFolder(QString who, QString cwd, QString path) const;
@@ -122,6 +123,8 @@ class Share: public QObject {
 		
 		static bool resolvePath(QString cwd, QString path, QString &resolved);
 		static bool parentPath(QString cwd, QString path, QString &resolved);
+		static bool movePath(QString cwd, QString oldroot, QString newroot, QString file, QString &newfile);
+		static QString root();
 
 	private:
 		QString m_folder;
@@ -147,27 +150,113 @@ class Share: public QObject {
 		{ return filesystemPath(cwd, path, fspath, true); }
 };
 
-class RecursiveDeleteFrame;
+class WalkShareFrame;
+class WalkShare: public QObject {
+	Q_OBJECT;
+
+	QPointer<Share> m_share;
+	QList<WalkShareFrame*> m_stack;
+	QString m_cwd;
+	int m_depth;
+	bool m_ok, m_done;
+
+	static QString move(QStringList::const_iterator &f);
+	
+public:
+	WalkShare(QObject *parent, Share *share, QString cwd, QString file, int depth = -1);
+	~WalkShare();
+	
+signals:
+	void done(bool);
+	void file(QString);
+	void enterFolder(QString);
+	void leaveFolder(QString);
+	void error(QString);
+	
+	void processSignal();
+	void errorSignal(QString);
+
+public slots:
+	void getNext();
+	void skipFolder();
+	
+private slots:
+	void process();
+};
+
 class RecursiveDelete: public QObject {
 	Q_OBJECT;
 	
 	QString m_who;
 	QPointer<Share> m_share;
-	QList<RecursiveDeleteFrame*> m_stack;
 	QString m_cwd;
-	bool m_ok;
-	
-	QString current_path();
+	bool m_ok, m_done;
+
+	void emit_error(QString);
 	
 public:
 	RecursiveDelete(QObject *parent, QString who, Share *share, QString cwd, QString file);
+	~RecursiveDelete();
 	
 signals:
-	void done(bool ok);
-	void processSignal();
+	void done(bool);
+	void error(QString file);
+	void getNext();
 	
 private slots:
-	void process();
+	void deleteFile(QString);
+	void deleteFolder(QString);
+	void walkDone(bool);
+};
+
+class RecursiveCopy: public QObject {
+	Q_OBJECT;
+
+	QString m_who;
+	QPointer<Share> m_share;
+	QString m_cwd;
+	QString m_oldfile, m_newfile;
+	bool m_delete_originals, m_ok, m_done;
+
+	QPointer<QFile> m_in, m_out;
+	QString m_in_file, m_out_file;
+
+	void emit_error(QString);
+
+public:
+	RecursiveCopy(QObject *parent, QString who, Share *share, QString cwd, QString file, QString newfile, int depth = -1, bool delete_originals = false);
+	~RecursiveCopy();
+
+signals:
+	void done(bool ok);
+	void error(QString);
+	void getNext();
+	void skipFolder();
+	void copySignal();
+
+private slots:
+	void copy();
+	void copyFile(QString);
+	void copyFolder(QString);
+	void deleteFolder(QString);
+	void walkDone(bool);
+};
+
+class RecursiveMove: public QObject {
+	Q_OBJECT;
+
+	bool m_ok, m_done;
+
+public:
+	RecursiveMove(QObject *parent, QString who, Share *share, QString cwd, QString file, QString newfile);
+	~RecursiveMove();
+
+signals:
+	void done(bool);
+	void error(QString);
+
+private slots:
+	void setDone(bool);
 };
 
 }

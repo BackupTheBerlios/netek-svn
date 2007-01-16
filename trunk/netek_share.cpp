@@ -65,6 +65,9 @@ neteK::Share::Share()
 : m_port(0), m_run(false), m_permission(PermissionRO), m_access(AccessAnonymous), m_type(TypeHTTP), m_client_count(0)
 { }
 
+QString neteK::Share::root()
+{ return "/"; }
+
 QString neteK::Share::URLScheme() const
 {
 	return m_type == TypeHTTP ? "http" : "ftp";
@@ -409,6 +412,31 @@ QFile *neteK::Share::readFile(QString who, QString cwd, QString path, qint64 pos
 	return 0;
 }
 
+bool neteK::Share::copyFile(QString who, QString cwd, QString path, QString path2, QFile *&rf_, QFile *&wf_) const
+{
+	if(m_permission == PermissionRO)
+		return false;
+		
+	if(filesystemPathNotRoot(cwd, path, path) && filesystemPathNotRoot(cwd, path2, path2) && path != path2) {
+		QFile *rf = new QFile(path);
+		QFile *wf = new QFile(path2);
+		if((m_permission == PermissionRW || !wf->exists())
+			&& rf->open(QIODevice::ReadOnly)
+			&& wf->open(QIODevice::WriteOnly))
+		{
+			logAction(who, tr("copying file %1 into %2").arg(path).arg(path2));
+			rf_ = rf;
+			wf_ = wf;
+			return true;
+		}
+			
+		delete rf;
+		delete wf;
+	}
+	
+	return false;
+}
+
 QFile *neteK::Share::writeFile(QString who, QString cwd, QString path, bool append) const
 {
 	if(m_permission == PermissionRO)
@@ -497,6 +525,25 @@ bool neteK::Share::parentPath(QString cwd, QString path, QString &resolved)
 	return false;
 }
 
+bool neteK::Share::movePath(QString cwd, QString oldroot, QString newroot, QString file, QString &newfile)
+{
+	if(resolvePath(cwd, oldroot, oldroot)
+		&& resolvePath(cwd, newroot, newroot)
+		&& resolvePath(cwd, file, file)
+		&& oldroot != newroot
+		&& file.startsWith(oldroot))
+	{
+		QString f = newroot;
+		if(file.size() > oldroot.size())
+			f += '/' + file.mid(oldroot.size());
+		if(resolvePath(cwd, f, newfile)) {
+			qDebug() << "=== Move target:" << newfile;
+			return true;
+		}
+	}
+	return false;
+}
+
 bool neteK::Share::resolvePath(QString cwd, QString path, QString &resolved)
 {
 	cwd.replace('\\', '/');
@@ -555,84 +602,339 @@ void neteK::Share::logAction(QString who, QString what) const
 }
 
 namespace neteK {
-
-class RecursiveDeleteFrame: QObject {
-	Q_OBJECT;
 	
+class WalkShareFrame {
 public:
-	RecursiveDeleteFrame(QObject *parent)
-	: QObject(parent)
-	{ }
-	
-	QFileInfoList files;
-	QFileInfoList::const_iterator file;
+	WalkShareFrame(): skipFolder(false) { }
+	QStringList files;
+	QStringList::const_iterator file;
+	bool skipFolder;
 };
 
 }
 
-neteK::RecursiveDelete::RecursiveDelete(QObject *p, QString who, Share *share, QString cwd, QString file)
-: QObject(p), m_who(who), m_share(share), m_cwd(cwd), m_ok(true)
+neteK::WalkShare::WalkShare(QObject *parent, Share *share, QString cwd, QString file, int depth)
+: QObject(parent), m_share(share), m_cwd(cwd), m_depth(depth), m_ok(true), m_done(false)
 {
-	RecursiveDeleteFrame *f = new RecursiveDeleteFrame(this);
-	m_stack.append(f);
-	QFileInfo info;
-	if(m_share->fileInformation(m_cwd, file, info)) {
-		f->files.append(info);
-		f->file = f->files.begin();
-	} else {
-		f->file = f->files.end();
-		m_ok = false;
-	}
-	
 	connect(this, SIGNAL(processSignal()), SLOT(process()), Qt::QueuedConnection);
+	connect(this, SIGNAL(errorSignal(QString)), SIGNAL(error(QString)), Qt::QueuedConnection);
+
+	QFileInfo tmp;
+	if(m_share->fileInformation(m_cwd, file, tmp)) {
+		WalkShareFrame *f = new WalkShareFrame;
+		f->files.append(file);
+		f->file = f->files.begin();
+		m_stack.append(f);
+		getNext();
+	} else {
+		m_ok = false;
+		emit errorSignal(file);
+	}
+}
+
+neteK::WalkShare::~WalkShare()
+{
+	foreach(WalkShareFrame *f, m_stack)
+		delete f;
+	m_stack.clear();
+
+	if(m_done)
+		emit done(m_ok);
+}
+
+void neteK::WalkShare::getNext()
+{
 	emit processSignal();
 }
 
-void neteK::RecursiveDelete::process()
+QString neteK::WalkShare::move(QStringList::const_iterator &f)
 {
-	RecursiveDeleteFrame *f = m_stack.last();
+	QString name = *f;
+	++f;
+	return name;
+}
+
+void neteK::WalkShare::process()
+{
+	if(m_stack.empty()) {
+		if(!m_done) {
+			m_done = true;
+			deleteLater();
+		}
+		return;
+	}
+		
+	WalkShareFrame *f = m_stack.last();
 	if(f->file == f->files.end()) {
 		delete f;
 		m_stack.pop_back();
-		
-		if(m_stack.isEmpty()) {
-			emit done(m_ok);
-			deleteLater();
-			return;
+		if(m_stack.size()) {
+			WalkShareFrame *fr = m_stack.last();
+			QString name = move(fr->file);
+			if(!skipFolder) {
+				emit leaveFolder(name);
+				return;
+			}
 		}
-		
-		if(!m_share->deleteFolder(m_who, m_cwd, current_path()))
-			m_ok = false;
-		
-		++m_stack.last()->file;
+		getNext();
 	} else {
-		QString path = current_path();
-		
-		if(m_share->deleteFile(m_who, m_cwd, path) || m_share->deleteFolder(m_who, m_cwd, path)) {
-			++f->file;
-		} else {
-			RecursiveDeleteFrame *fr = new RecursiveDeleteFrame(this);
-			m_stack.append(fr);
-			if(m_share->listFolder(m_cwd, path, fr->files)) {
+		QFileInfo fi;
+		bool err = !m_share->fileInformation(m_cwd, *f->file, fi);
+
+		if(!err && !fi.isSymLink() && fi.isDir() && (m_depth < 0 || m_stack.size() <= m_depth)) {
+			QFileInfoList info;
+			if(m_share->listFolder(m_cwd, *f->file, info)) {
+				WalkShareFrame *fr = new WalkShareFrame;
+				foreach(QFileInfo i, info)
+					fr->files.append(QString("%1/%2").arg(*f->file).arg(i.fileName()));
 				fr->file = fr->files.begin();
+				m_stack.append(fr);
+				emit enterFolder(*f->file);
+				return;
 			} else {
-				fr->files.clear();
-				fr->file = fr->files.end();
+				err = true;
+			}
+		}
+
+		QString name = move(f->file);
+		if(err)
+			emit error(name);
+		else
+			emit file(name);
+	}
+}
+
+void neteK::WalkShare::skipFolder()
+{
+	if(m_stack.size()) {
+		WalkShareFrame *f = m_stack.last();
+		f->file = m_stack.last()->files.end();
+		f->skipFolder = true;
+	}
+	getNext();
+}
+
+neteK::RecursiveDelete::RecursiveDelete(QObject *p, QString who, Share *share, QString cwd, QString file)
+: QObject(p), m_who(who), m_share(share), m_cwd(cwd), m_ok(true), m_done(false)
+{
+	WalkShare *walk = new WalkShare(this, m_share, m_cwd, file);
+	connect(walk, SIGNAL(file(QString)), SLOT(deleteFile(QString)));
+	connect(walk, SIGNAL(enterFolder(QString)), SIGNAL(getNext()));
+	connect(walk, SIGNAL(leaveFolder(QString)), SLOT(deleteFolder(QString)));
+	connect(walk, SIGNAL(error(QString)), SIGNAL(error(QString)));
+	connect(walk, SIGNAL(error(QString)), SIGNAL(getNext()));
+	connect(walk, SIGNAL(done(bool)), SLOT(walkDone(bool)));
+	walk->connect(this, SIGNAL(getNext()), SLOT(getNext()));
+}
+
+void neteK::RecursiveDelete::emit_error(QString f)
+{
+	m_ok = false;
+	emit error(f);
+}
+
+neteK::RecursiveDelete::~RecursiveDelete()
+{
+	if(m_done)
+		emit done(m_ok);
+}
+
+void neteK::RecursiveDelete::deleteFile(QString f)
+{
+	emit getNext();
+	if(!m_share->deleteFile(m_who, m_cwd, f))
+		emit_error(f);
+}
+
+void neteK::RecursiveDelete::deleteFolder(QString f)
+{
+	emit getNext();
+	if(!m_share->deleteFolder(m_who, m_cwd, f))
+		emit_error(f);
+}
+
+void neteK::RecursiveDelete::walkDone(bool ok)
+{
+	if(!ok)
+		m_ok = false;
+
+	if(!m_done) {
+		m_done = true;
+		deleteLater();
+	}
+}
+
+neteK::RecursiveCopy::RecursiveCopy(QObject *parent, QString who, Share *share, QString cwd, QString file, QString newfile, int depth, bool delete_originals)
+: QObject(parent), m_who(who), m_share(share), m_cwd(cwd), m_oldfile(file), m_newfile(newfile), m_delete_originals(delete_originals), m_ok(true), m_done(false)
+{
+	WalkShare *walk = new WalkShare(this, m_share, m_cwd, file, depth);
+	connect(walk, SIGNAL(file(QString)), SLOT(copyFile(QString)));
+	connect(walk, SIGNAL(enterFolder(QString)), SLOT(copyFolder(QString)));
+	connect(walk, SIGNAL(leaveFolder(QString)), m_delete_originals ? SLOT(deleteFolder(QString) : SIGNAL(getNext())));
+	connect(walk, SIGNAL(error(QString)), SIGNAL(error(QString)));
+	connect(walk, SIGNAL(error(QString)), SIGNAL(getNext()));
+	connect(walk, SIGNAL(done(bool)), SLOT(walkDone(bool)));
+	walk->connect(this, SIGNAL(getNext()), SLOT(getNext()));
+	walk->connect(this, SIGNAL(skipFolder()), SLOT(skipFolder()));
+
+	connect(this, SIGNAL(copySignal()), SLOT(copy()), Qt::QueuedConnection);
+}
+
+void neteK::RecursiveCopy::emit_error(QString f)
+{
+	m_ok = false;
+	emit error(f);
+}
+
+void neteK::RecursiveCopy::copyFile(QString file)
+{
+	QString newfile;
+	if(Share::movePath(m_cwd, m_oldfile, m_newfile, file, newfile)) {
+		QFileInfo info;
+		if(m_share->fileInformation(m_cwd, file, info)) {
+			if(info.isSymLink()) {
+				emit getNext();
+				return;
+			} else {
+				QFile *rf, *wf;
+				if(m_share->copyFile(m_who, m_cwd, file, newfile, rf, wf)) {
+					rf->setParent(this);
+					wf->setParent(this);
+					if(m_in)
+						m_in->deleteLater();
+					if(m_out)
+						m_out->deleteLater();
+					m_in = rf;
+					m_out = wf;
+					m_in_file = file;
+					m_out_file = newfile;
+					emit copySignal();
+					return;
+				}
 			}
 		}
 	}
-	
-	emit processSignal();
+
+	emit getNext();
+	emit_error(file);
 }
 
-QString neteK::RecursiveDelete::current_path()
+void neteK::RecursiveCopy::copyFolder(QString file)
 {
-	QString path;
-	foreach(RecursiveDeleteFrame *fr, m_stack) {
-		path += '/';
-		path += fr->file->fileName();
+	QString newfile;
+	if(!Share::movePath(m_cwd, m_oldfile, m_newfile, file, newfile)) {
+		emit getNext();
+		emit_error(file);
+		return;
 	}
-	return path;
+
+	if(m_share->createFolder(m_who, m_cwd, newfile)) {
+		emit getNext();
+	} else {
+		emit skipFolder();
+		emit_error(newfile);
+	}
 }
 
-#include "netek_share.moc"
+void neteK::RecursiveCopy::deleteFolder(QString file)
+{
+	emit getNext();
+	if(!m_share->deleteFolder(m_who, m_cwd, file))
+		emit_error(file);
+}
+
+void neteK::RecursiveCopy::copy()
+{
+	bool next = false;
+	QString *err = 0;
+	if(m_in && m_out) {
+		if(m_in->atEnd()) {
+			next = true;
+		} else {
+			char buf[networkBufferSize];
+			qint64 size = m_in->read(buf, sizeof(buf));
+			if(size < 0) {
+				err = &m_in_file;
+			} else {
+				if(size == m_out->write(buf, size))
+					emit copySignal();
+				else
+					err = &m_out_file;
+			}
+		}
+	}
+
+	if(next || err) {
+		if(m_in) {
+			if(!err && m_delete_originals) {
+				m_in->close();
+				m_in->remove();
+			}
+			m_in->deleteLater();
+			m_in = 0;
+		}
+
+		if(m_out) {
+			if(err) {
+				m_out->close();
+				m_out->remove();
+			}
+			m_out->deleteLater();
+			m_out = 0;
+		}
+
+		emit getNext();
+
+		if(err)
+			emit_error(*err);
+	}
+}
+
+void neteK::RecursiveCopy::walkDone(bool ok)
+{
+	if(!ok)
+		m_ok = false;
+
+	if(!m_done) {
+		m_done = true;
+		deleteLater();
+	}
+}
+
+neteK::RecursiveCopy::~RecursiveCopy()
+{
+	if(m_done)
+		emit done(m_ok);
+}
+
+neteK::RecursiveMove::RecursiveMove(QObject *parent, QString who, Share *share, QString cwd, QString file, QString newfile)
+: QObject(parent), m_ok(true), m_done(false)
+{
+	QString target;
+	if(!Share::movePath(cwd, file, newfile, file, target)) {
+		setDone(false);
+		return;
+	}
+
+	if(share->rename(who, cwd, file, target)) {
+		setDone(true);
+		return;
+	}
+
+	RecursiveCopy *copy = new RecursiveCopy(this, who, share, cwd, file, newfile, -1, true);
+	connect(copy, SIGNAL(done(bool)), SLOT(setDone(bool)));
+	connect(copy, SIGNAL(
+}
+
+neteK::RecursiveMove::~RecursiveMove()
+{
+	if(m_done)
+		emit done(m_ok);
+}
+
+void neteK::RecursiveMove::setDone(bool ok)
+{
+	m_ok = ok;
+	m_done = true;
+	deleteLater();
+}

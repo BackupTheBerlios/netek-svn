@@ -20,6 +20,10 @@
 // TODO: use kde-config for konq services menu
 // TODO: remove QPointers on stack
 // TODO: ip based filter
+// TODO: use inno setup
+// TODO: remove all exec()s
+// TODO: use builtin tray icon
+// TODO: get rid of netek.rc win32 file
 
 #include "netek_application.h"
 #include "netek_gui.h"
@@ -49,21 +53,6 @@ int main(int argc, char *argv[])
 	);
 
 	neteK::Application app(argc, argv);
-
-	{
-		QStringList broken;
-		// set Qt tasks 105055, 105708
-		broken.append("4.1.0");
-		broken.append("4.1.1");
-		broken.append("4.1.2");
-		
-		if(broken.contains(qVersion()))
-			QMessageBox::warning(0, qApp->applicationName(),
-				QObject::tr("Your version of Qt has a bug, which is known to break this application.\nBad Qt versions: %1.")
-					.arg(broken.join(", ")),
-				QMessageBox::Ok, QMessageBox::NoButton);
-	}
-
 	neteK::Gui gui;
 
 	//gui.show();
